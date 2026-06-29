@@ -1,5 +1,4 @@
-import { renderTemplateFile } from "../template.js";
+import { renderTemplateFile } from "../template.js"
 
-export function printHelp(): void {
-  console.log(renderTemplateFile(new URL("./help.txt", import.meta.url)));
-}
+export const printHelp = (): void =>
+  console.log(renderTemplateFile(new URL("./help.txt", import.meta.url)))

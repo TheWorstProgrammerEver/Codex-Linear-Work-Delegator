@@ -1,12 +1,12 @@
-import type { Config } from "../env/types.js";
+import type { Config } from "../env/types.js"
 
 interface GraphQLError {
-  message: string;
+  message: string
 }
 
 interface GraphQLResponse<T> {
-  data?: T;
-  errors?: GraphQLError[];
+  data?: T
+  errors?: GraphQLError[]
 }
 
 export class LinearGraphQLClient {
@@ -20,17 +20,16 @@ export class LinearGraphQLClient {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ query, variables })
-    });
+    })
 
-    if (!response.ok) throw new Error(`Linear API HTTP ${response.status}: ${await response.text()}`);
+    if (!response.ok) throw new Error(`Linear API HTTP ${response.status}: ${await response.text()}`)
 
-    const payload = await response.json() as GraphQLResponse<T>;
-    if (payload.errors?.length) throw new Error(formatGraphQLErrors(payload.errors));
-    if (!payload.data) throw new Error("Linear API response did not include data");
-    return payload.data;
+    const payload = await response.json() as GraphQLResponse<T>
+    if (payload.errors?.length) throw new Error(formatGraphQLErrors(payload.errors))
+    if (!payload.data) throw new Error("Linear API response did not include data")
+    return payload.data
   }
 }
 
-function formatGraphQLErrors(errors: GraphQLError[]): string {
-  return `Linear API error: ${errors.map((error) => error.message).join("; ")}`;
-}
+const formatGraphQLErrors = (errors: GraphQLError[]): string =>
+  `Linear API error: ${errors.map((error) => error.message).join("; ")}`

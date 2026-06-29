@@ -1,9 +1,9 @@
-import { resolve } from "node:path";
-import { mergeEnvFile } from "./env/files.js";
-import { parseArgs } from "./env/args.js";
-import type { CliOptions, Config, EnvMap } from "./env/types.js";
+import { resolve } from "node:path"
+import { mergeEnvFile } from "./env/files.js"
+import { parseArgs } from "./env/args.js"
+import type { CliOptions, Config, EnvMap } from "./env/types.js"
 
-export { parseArgs };
+export { parseArgs }
 
 const FLAG_ENV_KEYS = [
   ["linear-api-key", "LINEAR_API_KEY"],
@@ -24,19 +24,19 @@ const FLAG_ENV_KEYS = [
   ["wait-timeout-seconds", "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"],
   ["lock-stale-seconds", "CODEX_LINEAR_LOCK_STALE_SECONDS"],
   ["fetch-limit", "CODEX_LINEAR_FETCH_LIMIT"]
-] as const;
+] as const
 
 export function loadConfig(options: CliOptions, cwd: string): Config {
-  const merged: EnvMap = {};
+  const merged: EnvMap = {}
 
-  mergeEnvFile(merged, resolve(cwd, ".env.defaults"), false);
-  mergeEnvFile(merged, resolve(cwd, ".env.local"), false);
-  options.envFiles.forEach((envFile) => mergeEnvFile(merged, resolve(cwd, envFile), true));
-  Object.assign(merged, process.env);
-  applyFlags(merged, options.flags);
+  mergeEnvFile(merged, resolve(cwd, ".env.defaults"), false)
+  mergeEnvFile(merged, resolve(cwd, ".env.local"), false)
+  options.envFiles.forEach((envFile) => mergeEnvFile(merged, resolve(cwd, envFile), true))
+  Object.assign(merged, process.env)
+  applyFlags(merged, options.flags)
 
-  const linearApiKey = required(merged, "LINEAR_API_KEY");
-  const stateDir = value(merged, "CODEX_LINEAR_STATE_DIR", `${process.env.HOME ?? "."}/.local/state/codex-linear-work-delegator`);
+  const linearApiKey = required(merged, "LINEAR_API_KEY")
+  const stateDir = value(merged, "CODEX_LINEAR_STATE_DIR", `${process.env.HOME ?? "."}/.local/state/codex-linear-work-delegator`)
 
   return {
     linearApiKey,
@@ -59,47 +59,43 @@ export function loadConfig(options: CliOptions, cwd: string): Config {
     fetchLimit: integer(merged, "CODEX_LINEAR_FETCH_LIMIT", 50),
     dryRun: options.flags["dry-run"] === true,
     noSpawn: options.flags["no-spawn"] === true
-  };
+  }
 }
 
 function applyFlags(env: EnvMap, flags: CliOptions["flags"]): void {
   FLAG_ENV_KEYS.forEach(([flag, key]) => {
-    const flagValue = flags[flag];
-    if (typeof flagValue === "string") env[key] = flagValue;
-  });
+    const flagValue = flags[flag]
+    if (typeof flagValue === "string") env[key] = flagValue
+  })
 }
 
 function required(env: EnvMap, key: string): string {
-  const found = optional(env, key);
-  if (!found) throw new Error(`Missing required configuration: ${key}`);
-  return found;
+  const found = optional(env, key)
+  if (!found) throw new Error(`Missing required configuration: ${key}`)
+  return found
 }
 
-function optional(env: EnvMap, key: string): string | undefined {
-  const found = env[key]?.trim();
-  return found ? found : undefined;
+const optional = (env: EnvMap, key: string): string | undefined => {
+  const found = env[key]?.trim()
+  return found ? found : undefined
 }
 
-function value(env: EnvMap, key: string, fallback: string): string {
-  return optional(env, key) ?? fallback;
-}
+const value = (env: EnvMap, key: string, fallback: string): string =>
+  optional(env, key) ?? fallback
 
-function list(input: string): string[] {
-  return input.split(",").map((item) => item.trim()).filter(Boolean);
-}
+const list = (input: string): string[] =>
+  input.split(",").map((item) => item.trim()).filter(Boolean)
 
-function seconds(env: EnvMap, key: string, fallback: number): number {
-  return integer(env, key, fallback) * 1000;
-}
+const seconds = (env: EnvMap, key: string, fallback: number): number =>
+  integer(env, key, fallback) * 1000
 
 function integer(env: EnvMap, key: string, fallback: number): number {
-  const raw = optional(env, key);
-  if (!raw) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${key} must be a non-negative integer`);
-  return parsed;
+  const raw = optional(env, key)
+  if (!raw) return fallback
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${key} must be a non-negative integer`)
+  return parsed
 }
 
-function splitArgs(input: string): string[] {
-  return input.split(/\s+/).map((item) => item.trim()).filter(Boolean);
-}
+const splitArgs = (input: string): string[] =>
+  input.split(/\s+/).map((item) => item.trim()).filter(Boolean)

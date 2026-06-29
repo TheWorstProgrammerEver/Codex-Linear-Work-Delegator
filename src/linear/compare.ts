@@ -1,17 +1,13 @@
-import type { LinearIssue } from "./types.js";
+import type { LinearIssue } from "./types.js"
 
-export function compareIssues(left: LinearIssue, right: LinearIssue): number {
-  return byPriority(left, right) || byCreatedAt(left, right);
-}
+export const compareIssues = (left: LinearIssue, right: LinearIssue): number =>
+  byPriority(left, right) || byCreatedAt(left, right)
 
-function byPriority(left: LinearIssue, right: LinearIssue): number {
-  return normalizedPriority(left) - normalizedPriority(right);
-}
+const byPriority = (left: LinearIssue, right: LinearIssue): number =>
+  normalizedPriority(left) - normalizedPriority(right)
 
-function byCreatedAt(left: LinearIssue, right: LinearIssue): number {
-  return Date.parse(left.createdAt) - Date.parse(right.createdAt);
-}
+const byCreatedAt = (left: LinearIssue, right: LinearIssue): number =>
+  Date.parse(left.createdAt) - Date.parse(right.createdAt)
 
-function normalizedPriority(issue: LinearIssue): number {
-  return issue.priority === 0 ? Number.MAX_SAFE_INTEGER : issue.priority;
-}
+const normalizedPriority = (issue: LinearIssue): number =>
+  issue.priority === 0 ? Number.MAX_SAFE_INTEGER : issue.priority
