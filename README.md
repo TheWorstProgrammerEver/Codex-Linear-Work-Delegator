@@ -183,6 +183,22 @@ Persistent=true
 WantedBy=timers.target
 ```
 
+Basic host install/uninstall scripts live under `scripts/`:
+
+```bash
+sudo ./scripts/install-schedule.sh
+sudo ./scripts/uninstall-schedule.sh
+```
+
+Defaults:
+
+- installs `codex-linear-work-delegator.service` and `codex-linear-work-delegator.timer` under `/etc/systemd/system`;
+- runs as the invoking sudo user by default;
+- reads env from `~/.config/codex-linear-work-delegator/env`;
+- polls every 5 minutes after a 2 minute boot delay.
+
+Override behavior with environment variables such as `TARGET_USER`, `ENV_FILE`, `REPO_DIR`, `WAIT_TIMEOUT_SECONDS`, `ON_BOOT_SEC`, `POLL_INTERVAL`, `ACCURACY_SEC`, `SYSTEMD_DIR`, or `SYSTEMCTL_BIN`.
+
 ## Claim Behavior
 
 When an issue is claimed, the CLI:
