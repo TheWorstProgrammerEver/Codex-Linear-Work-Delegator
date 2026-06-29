@@ -4,13 +4,13 @@ Issue: {{ identifier }}
 Title: {{ title }}
 URL: {{ url }}
 
-Linear issue snapshot at claim time:
+Compact Linear issue snapshot at claim time:
 ```json
 {{ issueSnapshotJson }}
 ```
 
 Use the configured Linear MCP/tools if available to read the full issue, comments, and current state.
-Start from the snapshot above, but refresh Linear if anything appears stale or incomplete.
+Treat the snapshot above as fallback context only; refresh Linear before acting when the tools are available.
 When posting Linear comments, sign off with a simple signature line: "— {{ agentId }}."
 Work locally on this Raspberry Pi. Do not use Codex Cloud Tasks.
 
