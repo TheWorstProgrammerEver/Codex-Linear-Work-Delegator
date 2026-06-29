@@ -1,0 +1,7 @@
+query CandidateIssues($first: Int!) {
+  issues(first: $first) {
+    nodes {
+      {{ issueFields }}
+    }
+  }
+}

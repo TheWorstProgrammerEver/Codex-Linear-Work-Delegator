@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Config } from "./types.js";
+import type { Config } from "./env/types.js";
 
 export interface LockHandle {
   release(): void;

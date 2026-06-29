@@ -7,8 +7,9 @@
     "codex-linear-work-delegator": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js",
+    "build": "rm -rf dist && tsc -p tsconfig.json && npm run copy-assets && chmod +x dist/cli.js",
     "check": "tsc -p tsconfig.json --noEmit",
+    "copy-assets": "cp src/cli/help.txt dist/cli/help.txt && cp src/codex/prompt.md dist/codex/prompt.md && cp src/linear/queries/*.graphql dist/linear/queries/",
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts"
   },

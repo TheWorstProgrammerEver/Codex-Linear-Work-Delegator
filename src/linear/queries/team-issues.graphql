@@ -1,0 +1,9 @@
+query TeamIssues($id: String!, $first: Int!) {
+  team(id: $id) {
+    issues(first: $first) {
+      nodes {
+        {{ issueFields }}
+      }
+    }
+  }
+}

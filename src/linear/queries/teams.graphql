@@ -1,0 +1,5 @@
+query Teams($first: Int!) {
+  teams(first: $first) {
+    nodes { id key name }
+  }
+}

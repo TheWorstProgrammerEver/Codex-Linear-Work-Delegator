@@ -1,60 +1,39 @@
-import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import type { CliOptions, Config, EnvMap } from "./types.js";
+import { mergeEnvFile } from "./env/files.js";
+import { parseArgs } from "./env/args.js";
+import type { CliOptions, Config, EnvMap } from "./env/types.js";
 
-export function parseArgs(argv: string[]): CliOptions {
-  const envFiles: string[] = [];
-  const flags: Record<string, string | boolean> = {};
+export { parseArgs };
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (!arg.startsWith("--")) {
-      throw new Error(`Unexpected positional argument: ${arg}`);
-    }
-
-    const [rawName, inlineValue] = arg.slice(2).split("=", 2);
-    const name = rawName.trim();
-    const value = inlineValue ?? argv[index + 1];
-
-    if (name === "env-file") {
-      if (inlineValue === undefined) index += 1;
-      if (!value || value.startsWith("--")) throw new Error("--env-file requires a path");
-      envFiles.push(value);
-      continue;
-    }
-
-    if (name === "dry-run" || name === "no-spawn" || name === "help") {
-      flags[name] = true;
-      continue;
-    }
-
-    if (inlineValue === undefined) index += 1;
-    if (!value || value.startsWith("--")) throw new Error(`--${name} requires a value`);
-    flags[name] = value;
-  }
-
-  return { envFiles, flags };
-}
+const FLAG_ENV_KEYS = [
+  ["linear-api-key", "LINEAR_API_KEY"],
+  ["linear-api-url", "CODEX_LINEAR_API_URL"],
+  ["team-key", "CODEX_LINEAR_TEAM_KEY"],
+  ["agent-id", "CODEX_LINEAR_AGENT_ID"],
+  ["agent-labels", "CODEX_LINEAR_AGENT_LABELS"],
+  ["ready-status", "CODEX_LINEAR_READY_STATUS"],
+  ["running-status", "CODEX_LINEAR_RUNNING_STATUS"],
+  ["blocked-status", "CODEX_LINEAR_BLOCKED_STATUS"],
+  ["review-status", "CODEX_LINEAR_REVIEW_STATUS"],
+  ["default-model", "CODEX_LINEAR_DEFAULT_MODEL"],
+  ["default-sandbox", "CODEX_LINEAR_DEFAULT_SANDBOX"],
+  ["codex-bin", "CODEX_LINEAR_CODEX_BIN"],
+  ["codex-cwd", "CODEX_LINEAR_CODEX_CWD"],
+  ["codex-extra-args", "CODEX_LINEAR_CODEX_EXTRA_ARGS"],
+  ["state-dir", "CODEX_LINEAR_STATE_DIR"],
+  ["wait-timeout-seconds", "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"],
+  ["lock-stale-seconds", "CODEX_LINEAR_LOCK_STALE_SECONDS"],
+  ["fetch-limit", "CODEX_LINEAR_FETCH_LIMIT"]
+] as const;
 
 export function loadConfig(options: CliOptions, cwd: string): Config {
   const merged: EnvMap = {};
 
   mergeEnvFile(merged, resolve(cwd, ".env.defaults"), false);
   mergeEnvFile(merged, resolve(cwd, ".env.local"), false);
-  for (const envFile of options.envFiles) mergeEnvFile(merged, resolve(cwd, envFile), true);
+  options.envFiles.forEach((envFile) => mergeEnvFile(merged, resolve(cwd, envFile), true));
   Object.assign(merged, process.env);
-
-  applyFlag(merged, options.flags, "linear-api-key", "LINEAR_API_KEY");
-  applyFlag(merged, options.flags, "team-key", "CODEX_LINEAR_TEAM_KEY");
-  applyFlag(merged, options.flags, "agent-id", "CODEX_LINEAR_AGENT_ID");
-  applyFlag(merged, options.flags, "agent-labels", "CODEX_LINEAR_AGENT_LABELS");
-  applyFlag(merged, options.flags, "ready-status", "CODEX_LINEAR_READY_STATUS");
-  applyFlag(merged, options.flags, "running-status", "CODEX_LINEAR_RUNNING_STATUS");
-  applyFlag(merged, options.flags, "default-model", "CODEX_LINEAR_DEFAULT_MODEL");
-  applyFlag(merged, options.flags, "default-sandbox", "CODEX_LINEAR_DEFAULT_SANDBOX");
-  applyFlag(merged, options.flags, "codex-cwd", "CODEX_LINEAR_CODEX_CWD");
-  applyFlag(merged, options.flags, "state-dir", "CODEX_LINEAR_STATE_DIR");
-  applyFlag(merged, options.flags, "wait-timeout-seconds", "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS");
+  applyFlags(merged, options.flags);
 
   const linearApiKey = required(merged, "LINEAR_API_KEY");
   const stateDir = value(merged, "CODEX_LINEAR_STATE_DIR", `${process.env.HOME ?? "."}/.local/state/codex-linear-work-delegator`);
@@ -83,27 +62,11 @@ export function loadConfig(options: CliOptions, cwd: string): Config {
   };
 }
 
-function mergeEnvFile(target: EnvMap, filePath: string, requiredFile: boolean): void {
-  if (!existsSync(filePath)) {
-    if (requiredFile) throw new Error(`Env file does not exist: ${filePath}`);
-    return;
-  }
-
-  const content = readFileSync(filePath, "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const equalsIndex = trimmed.indexOf("=");
-    if (equalsIndex === -1) continue;
-    const key = trimmed.slice(0, equalsIndex).trim();
-    const rawValue = trimmed.slice(equalsIndex + 1).trim();
-    target[key] = unquote(rawValue);
-  }
-}
-
-function applyFlag(env: EnvMap, flags: Record<string, string | boolean>, flag: string, key: string): void {
-  const flagValue = flags[flag];
-  if (typeof flagValue === "string") env[key] = flagValue;
+function applyFlags(env: EnvMap, flags: CliOptions["flags"]): void {
+  FLAG_ENV_KEYS.forEach(([flag, key]) => {
+    const flagValue = flags[flag];
+    if (typeof flagValue === "string") env[key] = flagValue;
+  });
 }
 
 function required(env: EnvMap, key: string): string {
@@ -135,13 +98,6 @@ function integer(env: EnvMap, key: string, fallback: number): number {
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${key} must be a non-negative integer`);
   return parsed;
-}
-
-function unquote(input: string): string {
-  if ((input.startsWith('"') && input.endsWith('"')) || (input.startsWith("'") && input.endsWith("'"))) {
-    return input.slice(1, -1);
-  }
-  return input;
 }
 
 function splitArgs(input: string): string[] {
