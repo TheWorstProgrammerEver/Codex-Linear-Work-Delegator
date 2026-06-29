@@ -1,0 +1,16 @@
+id
+identifier
+title
+url
+description
+priority
+priorityLabel
+createdAt
+updatedAt
+state { id name type }
+labels { nodes { id name parent { id name } } }
+team { id key name }
+assignee { id name email }
+creator { id name email }
+project { id name }
+cycle { id name }
