@@ -6,6 +6,13 @@ type ChildProcess = ReturnType<typeof spawn>
 type WaitResult = "exit" | "timeout"
 
 export async function waitForChildOrTimeout(config: Config, pid: number, child: ChildProcess): Promise<void> {
+  if (config.codexExecMode === "attached") {
+    await waitForExit(child)
+    clearCurrentState(config, pid)
+    console.log(`Codex child pid=${pid} exited.`)
+    return
+  }
+
   if (config.waitTimeoutMs === 0) {
     child.unref()
     return
@@ -28,4 +35,9 @@ const waitForExitOrTimeout = (timeoutMs: number, child: ChildProcess): Promise<W
       clearTimeout(timeout)
       resolve("exit")
     })
+  })
+
+const waitForExit = (child: ChildProcess): Promise<void> =>
+  new Promise((resolve) => {
+    child.once("exit", () => resolve())
   })

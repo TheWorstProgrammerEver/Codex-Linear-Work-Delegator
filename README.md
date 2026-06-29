@@ -4,6 +4,8 @@ Local CLI for a Raspberry Pi Codex worker. It polls Linear with a normal API key
 
 This is intentionally not Codex Cloud Tasks. Linear is the backlog and discussion surface; the Pi is the durable execution platform.
 
+The production operating model is single-agent and single-task: one Pi runs one Codex issue at a time. The default attached execution mode keeps this wrapper alive until `codex exec` exits, so the systemd service remains active for the full Codex run and the timer does not schedule overlapping work.
+
 ## Example Usage
 
 Install and build once:
@@ -19,6 +21,7 @@ Create `.env.local` with a Linear API key:
 LINEAR_API_KEY=<your-linear-api-key>
 CODEX_LINEAR_TEAM_KEY=RYA
 CODEX_LINEAR_AGENT_LABELS=agent:daedalus,agent:any
+CODEX_LINEAR_CODEX_EXEC_MODE=attached
 ```
 
 Preview the next claim:
@@ -129,7 +132,8 @@ npm start
 Useful flags:
 
 ```bash
-codex-linear-work-delegator --wait-timeout-seconds 60
+codex-linear-work-delegator --codex-exec-mode attached
+codex-linear-work-delegator --codex-exec-mode detached --wait-timeout-seconds 60
 codex-linear-work-delegator --env-file /etc/codex-linear-work-delegator.env
 codex-linear-work-delegator --dry-run
 codex-linear-work-delegator --no-spawn
@@ -145,13 +149,16 @@ agent:sandbox:workspace-write
 
 `CODEX_LINEAR_CODEX_EXTRA_ARGS` is appended after label-derived options, so static env args can intentionally override label-derived Codex config.
 
-The wait timeout controls how long this wrapper waits for the spawned Codex child before returning. It does not kill the child. The child PID stays in local state so the next scheduled run can see that work is still active.
+`CODEX_LINEAR_CODEX_EXEC_MODE` controls the Codex process lifecycle:
+
+- `attached` is the default production mode. The wrapper starts `codex exec` as a normal child process and waits until it exits. `CODEX_LINEAR_WAIT_TIMEOUT_SECONDS` is ignored in this mode.
+- `detached` preserves the older bounded-wait behavior for compatibility and testing. The wrapper detaches `codex exec`, waits up to `CODEX_LINEAR_WAIT_TIMEOUT_SECONDS`, then returns without killing the child. The child PID stays in local state so the next scheduled run can see that work is still active.
 
 ## Scheduler Shape
 
-Use a systemd timer or cron to invoke the CLI. The CLI holds a local global lock only during the short claim cycle, then releases it before running Codex.
+Use a systemd timer to invoke the CLI. The installed schedule is intentionally single-worker: the service is `Type=oneshot`, stays active for the full attached Codex run, has no normal runtime timeout, and the timer uses `OnUnitInactiveSec=5min` so the next scan is scheduled only after the previous service invocation exits.
 
-The local lock prevents multiple scheduled invocations on the same host from claiming multiple issues at once. Local busy state prevents the scheduler from starting another Codex child while one is already running.
+The local lock prevents multiple scheduled invocations on the same host from claiming multiple issues at once. Local busy state is an additional guard for manual runs; if the agent is already working, the CLI exits early with a clear busy message rather than claiming more work.
 
 Example service:
 
@@ -163,7 +170,9 @@ Description=Codex Linear Work Delegator
 Type=oneshot
 WorkingDirectory=/home/daedalus/github/TheWorstProgrammerEver/Codex-Linear-Work-Delegator
 EnvironmentFile=/home/daedalus/.config/codex-linear-work-delegator/env
-ExecStart=/usr/bin/npm start -- --wait-timeout-seconds 60
+ExecStart=/usr/bin/npm start -- --env-file /home/daedalus/.config/codex-linear-work-delegator/env
+TimeoutStartSec=infinity
+KillMode=control-group
 User=daedalus
 ```
 
@@ -197,17 +206,20 @@ Defaults:
 - reads env from `~/.config/codex-linear-work-delegator/env`;
 - polls every 5 minutes after a 2 minute boot delay.
 
-Override behavior with environment variables such as `TARGET_USER`, `ENV_FILE`, `REPO_DIR`, `WAIT_TIMEOUT_SECONDS`, `ON_BOOT_SEC`, `POLL_INTERVAL`, `ACCURACY_SEC`, `SYSTEMD_DIR`, or `SYSTEMCTL_BIN`.
+Override behavior with environment variables such as `TARGET_USER`, `ENV_FILE`, `REPO_DIR`, `ON_BOOT_SEC`, `POLL_INTERVAL`, `ACCURACY_SEC`, `SYSTEMD_DIR`, or `SYSTEMCTL_BIN`.
 
 ## Claim Behavior
 
 When an issue is claimed, the CLI:
 
-1. moves it to `Agent In Progress`;
-2. adds a concise claim comment;
-3. fetches a claim-time issue snapshot including description, labels, status, team, assignee, project, cycle, and recent comments;
-4. writes local state under `CODEX_LINEAR_STATE_DIR`;
-5. spawns `codex exec` for the issue with that snapshot in the prompt.
+1. checks for likely abandoned `Agent In Progress` issues for this agent and comments for manual review without changing their status;
+2. moves one eligible issue to `Agent In Progress`;
+3. adds a concise claim comment;
+4. fetches a claim-time issue snapshot including description, labels, status, team, assignee, project, cycle, and recent comments;
+5. writes local state under `CODEX_LINEAR_STATE_DIR`;
+6. spawns `codex exec` for the issue with that snapshot in the prompt.
+
+The startup health check treats `agent:daedalus` as directly relevant to Daedalus. For `agent:any`, it checks the latest claim comment and only warns if that comment says this agent claimed the issue. It does not mark issues failed, kill processes, or infer failure from age alone.
 
 Codex is instructed to update Linear when complete or blocked:
 

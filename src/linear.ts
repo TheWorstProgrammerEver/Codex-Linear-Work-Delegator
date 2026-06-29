@@ -19,9 +19,7 @@ export class LinearClient {
   }
 
   async getCandidateIssues(): Promise<LinearIssue[]> {
-    const issues = this.config.teamKey
-      ? await this.getTeamIssues(this.config.teamKey)
-      : await this.getAllVisibleIssues()
+    const issues = await this.getVisibleIssues()
 
     const candidates = issues.filter((issue) => {
       if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
@@ -30,6 +28,19 @@ export class LinearClient {
     })
 
     return candidates.sort(compareIssues)
+  }
+
+  async getRunningIssues(): Promise<LinearIssue[]> {
+    return (await this.getVisibleIssues()).filter((issue) => {
+      if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
+      return issue.state.name === this.config.runningStatus
+    })
+  }
+
+  private async getVisibleIssues(): Promise<LinearIssue[]> {
+    return this.config.teamKey
+      ? this.getTeamIssues(this.config.teamKey)
+      : this.getAllVisibleIssues()
   }
 
   private async getAllVisibleIssues(): Promise<LinearIssue[]> {
@@ -88,7 +99,7 @@ export class LinearClient {
     if (!data.issueUpdate.success) throw new Error(`Linear issueUpdate returned success=false for ${issueId}`)
   }
 
-  private async createComment(issueId: string, body: string): Promise<void> {
+  async createComment(issueId: string, body: string): Promise<void> {
     const data = await this.api.request<CommentCreateResponse>(commentCreateMutation, {
       input: { issueId, body }
     })
