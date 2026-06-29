@@ -215,9 +215,9 @@ When an issue is claimed, the CLI:
 1. checks for likely abandoned `Agent In Progress` issues for this agent and comments for manual review without changing their status;
 2. moves one eligible issue to `Agent In Progress`;
 3. adds a concise claim comment;
-4. fetches a claim-time issue snapshot including description, labels, status, team, assignee, project, cycle, and recent comments;
+4. fetches a compact claim-time issue snapshot with bounded description/comment text and lightweight status, label, team, assignee, project, and cycle context;
 5. writes local state under `CODEX_LINEAR_STATE_DIR`;
-6. spawns `codex exec` for the issue with that snapshot in the prompt.
+6. spawns `codex exec` for the issue with that compact fallback snapshot in the prompt.
 
 The startup health check treats `agent:daedalus` as directly relevant to Daedalus. For `agent:any`, it checks the latest claim comment and only warns if that comment says this agent claimed the issue. It does not mark issues failed, kill processes, or infer failure from age alone.
 
