@@ -11,7 +11,7 @@ Linear issue snapshot at claim time:
 
 Use the configured Linear MCP/tools if available to read the full issue, comments, and current state.
 Start from the snapshot above, but refresh Linear if anything appears stale or incomplete.
-When posting Linear comments, sign off with a simple signature line: "— Daedalus."
+When posting Linear comments, sign off with a simple signature line: "— {{ agentId }}."
 Work locally on this Raspberry Pi. Do not use Codex Cloud Tasks.
 
 When complete:
