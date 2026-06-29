@@ -1,0 +1,6 @@
+mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) {
+  issueUpdate(id: $id, input: $input) {
+    success
+    issue { id identifier state { id name type } }
+  }
+}

@@ -1,0 +1,24 @@
+Usage: codex-linear-work-delegator [options]
+
+Poll Linear, claim one eligible issue, then spawn Codex for that issue.
+
+Options:
+  --env-file <path>              Load an additional env file.
+  --dry-run                      Find the next issue but do not claim or spawn.
+  --no-spawn                     Claim the issue but do not spawn Codex.
+  --wait-timeout-seconds <sec>   Wait this long for Codex before returning. Default: 60.
+  --team-key <key>               Restrict polling to a Linear team key.
+  --agent-id <id>                Agent id used in claim comments.
+  --agent-labels <csv>           Eligible assignment labels.
+  --ready-status <name>          Eligible Linear status.
+  --running-status <name>        Claimed Linear status.
+  --blocked-status <name>        Blocked Linear status.
+  --review-status <name>         Review Linear status.
+  --default-model <model>        Codex model when no agent:model label is present.
+  --default-sandbox <mode>       Codex sandbox when no agent:sandbox label is present.
+  --codex-bin <path>             Codex executable.
+  --codex-cwd <path>             Working directory for codex exec.
+  --codex-extra-args <args>      Extra static args appended before the prompt.
+  --state-dir <path>             Local worker state directory.
+  --fetch-limit <count>          Linear issue fetch limit.
+  --help                         Show this help.

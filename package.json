@@ -1,0 +1,28 @@
+{
+  "name": "codex-linear-work-delegator",
+  "version": "0.1.0",
+  "description": "Local Linear issue delegator that claims work and spawns Codex only when needed.",
+  "type": "module",
+  "bin": {
+    "codex-linear-work-delegator": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json && npm run copy-assets && chmod +x dist/cli.js",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "copy-assets": "cp src/cli/help.txt dist/cli/help.txt && cp src/codex/prompt.md dist/codex/prompt.md && cp src/linear/queries/*.graphql dist/linear/queries/",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts"
+  },
+  "keywords": [
+    "codex",
+    "linear",
+    "worker",
+    "delegator"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
