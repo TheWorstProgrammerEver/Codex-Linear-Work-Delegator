@@ -1,6 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Config, CurrentState } from "./types.js";
+import type { Config } from "./env/types.js";
+
+export interface CurrentState {
+  issueId: string;
+  identifier: string;
+  url: string;
+  pid: number;
+  model: string;
+  startedAt: string;
+  logFile: string;
+}
 
 export function getCurrentState(config: Config): CurrentState | null {
   const file = currentStatePath(config);

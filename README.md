@@ -4,6 +4,35 @@ Local CLI for a Raspberry Pi Codex worker. It polls Linear with a normal API key
 
 This is intentionally not Codex Cloud Tasks. Linear is the backlog and discussion surface; the Pi is the durable execution platform.
 
+## Example Usage
+
+Install and build once:
+
+```bash
+npm install
+npm run build
+```
+
+Create `.env.local` with a Linear API key:
+
+```dotenv
+LINEAR_API_KEY=<your-linear-api-key>
+CODEX_LINEAR_TEAM_KEY=RYA
+CODEX_LINEAR_AGENT_LABELS=agent:daedalus,agent:any
+```
+
+Preview the next claim:
+
+```bash
+npm start -- --dry-run
+```
+
+Run a live claim without starting Codex yet:
+
+```bash
+npm start -- --no-spawn
+```
+
 ## Linear Setup
 
 Recommended statuses:
@@ -19,6 +48,7 @@ Recommended labels:
 - `agent:any`: any compatible local agent may pick it up.
 - `agent:model:gpt-5.5`: use the strong/default model.
 - `agent:model:gpt-5.4-mini`: use the cheaper/faster model for light work.
+- `agent:reasoning:high`: pass `model_reasoning_effort` to Codex for this issue.
 - Optional later: `agent:sandbox:workspace-write` or `agent:sandbox:danger-full-access`.
 
 An issue is eligible when:
@@ -104,6 +134,16 @@ codex-linear-work-delegator --env-file /etc/codex-linear-work-delegator.env
 codex-linear-work-delegator --dry-run
 codex-linear-work-delegator --no-spawn
 ```
+
+Issue labels can override Codex launch options:
+
+```text
+agent:model:gpt-5.4-mini
+agent:reasoning:low
+agent:sandbox:workspace-write
+```
+
+`CODEX_LINEAR_CODEX_EXTRA_ARGS` is appended after label-derived options, so static env args can intentionally override label-derived Codex config.
 
 The wait timeout controls how long this wrapper waits for the spawned Codex child before returning. It does not kill the child. The child PID stays in local state so the next scheduled run can see that work is still active.
 

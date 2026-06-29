@@ -1,0 +1,10 @@
+{{ issueFields }}
+comments(first: 20) {
+  nodes {
+    id
+    body
+    createdAt
+    updatedAt
+    user { id name email }
+  }
+}

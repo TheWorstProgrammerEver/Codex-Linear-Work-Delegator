@@ -1,0 +1,10 @@
+query WorkflowStates($first: Int!) {
+  workflowStates(first: $first) {
+    nodes {
+      id
+      name
+      type
+      team { id key name }
+    }
+  }
+}
