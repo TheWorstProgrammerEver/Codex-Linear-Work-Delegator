@@ -6,7 +6,7 @@ Options:
   --env-file <path>              Load an additional env file.
   --dry-run                      Find the next issue but do not claim or spawn.
   --no-spawn                     Claim the issue but do not spawn Codex.
-  --wait-timeout-seconds <sec>   Wait this long for Codex before returning. Default: 60.
+  --wait-timeout-seconds <sec>   Detached mode only: wait this long before returning. Default: 60.
   --team-key <key>               Restrict polling to a Linear team key.
   --agent-id <id>                Agent id used in claim comments.
   --agent-labels <csv>           Eligible assignment labels.
@@ -18,6 +18,7 @@ Options:
   --default-sandbox <mode>       Codex sandbox when no agent:sandbox label is present.
   --codex-bin <path>             Codex executable.
   --codex-cwd <path>             Working directory for codex exec.
+  --codex-exec-mode <mode>       Codex execution mode: attached or detached. Default: attached.
   --codex-extra-args <args>      Extra static args appended before the prompt.
   --state-dir <path>             Local worker state directory.
   --fetch-limit <count>          Linear issue fetch limit.

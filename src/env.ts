@@ -1,7 +1,7 @@
 import { resolve } from "node:path"
 import { mergeEnvFile } from "./env/files.js"
 import { parseArgs } from "./env/args.js"
-import type { CliOptions, Config, EnvMap } from "./env/types.js"
+import type { CliOptions, CodexExecMode, Config, EnvMap } from "./env/types.js"
 
 export { parseArgs }
 
@@ -19,6 +19,7 @@ const FLAG_ENV_KEYS = [
   ["default-sandbox", "CODEX_LINEAR_DEFAULT_SANDBOX"],
   ["codex-bin", "CODEX_LINEAR_CODEX_BIN"],
   ["codex-cwd", "CODEX_LINEAR_CODEX_CWD"],
+  ["codex-exec-mode", "CODEX_LINEAR_CODEX_EXEC_MODE"],
   ["codex-extra-args", "CODEX_LINEAR_CODEX_EXTRA_ARGS"],
   ["state-dir", "CODEX_LINEAR_STATE_DIR"],
   ["wait-timeout-seconds", "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"],
@@ -52,6 +53,7 @@ export function loadConfig(options: CliOptions, cwd: string): Config {
     defaultSandbox: value(merged, "CODEX_LINEAR_DEFAULT_SANDBOX", "danger-full-access"),
     codexBin: value(merged, "CODEX_LINEAR_CODEX_BIN", "codex"),
     codexCwd: value(merged, "CODEX_LINEAR_CODEX_CWD", process.cwd()),
+    codexExecMode: codexExecMode(merged, "CODEX_LINEAR_CODEX_EXEC_MODE", "attached"),
     codexExtraArgs: splitArgs(value(merged, "CODEX_LINEAR_CODEX_EXTRA_ARGS", "")),
     stateDir,
     waitTimeoutMs: seconds(merged, "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS", 60),
@@ -88,6 +90,12 @@ const list = (input: string): string[] =>
 
 const seconds = (env: EnvMap, key: string, fallback: number): number =>
   integer(env, key, fallback) * 1000
+
+function codexExecMode(env: EnvMap, key: string, fallback: CodexExecMode): CodexExecMode {
+  const raw = value(env, key, fallback)
+  if (raw === "attached" || raw === "detached") return raw
+  throw new Error(`${key} must be "attached" or "detached"`)
+}
 
 function integer(env: EnvMap, key: string, fallback: number): number {
   const raw = optional(env, key)

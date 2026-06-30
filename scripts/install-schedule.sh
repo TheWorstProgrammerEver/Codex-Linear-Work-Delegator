@@ -8,7 +8,6 @@ systemd_dir="${SYSTEMD_DIR:-/etc/systemd/system}"
 systemctl_bin="${SYSTEMCTL_BIN:-systemctl}"
 install_bin="${INSTALL_BIN:-install}"
 target_user="${TARGET_USER:-${SUDO_USER:-$(id -un)}}"
-wait_timeout_seconds="${WAIT_TIMEOUT_SECONDS:-60}"
 on_boot_sec="${ON_BOOT_SEC:-2min}"
 poll_interval="${POLL_INTERVAL:-5min}"
 accuracy_sec="${ACCURACY_SEC:-30s}"
@@ -65,7 +64,9 @@ Type=oneshot
 User=$target_user
 WorkingDirectory=$repo_dir
 EnvironmentFile=$env_file
-ExecStart=$npm_bin start -- --env-file $env_file --wait-timeout-seconds $wait_timeout_seconds
+ExecStart=$npm_bin start -- --env-file $env_file
+TimeoutStartSec=infinity
+KillMode=control-group
 
 [Install]
 WantedBy=multi-user.target

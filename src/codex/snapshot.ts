@@ -1,17 +1,15 @@
 import { formatLabel } from "../linear/labels.js"
 import type { LinearIssue } from "../linear/types.js"
 
-interface Person {
-  id: string
-  name: string
-  email?: string | null
-}
+const MAX_DESCRIPTION_LENGTH = 4_000
+const MAX_COMMENT_LENGTH = 1_500
+const MAX_RECENT_COMMENTS = 2
 
 export const buildIssueSnapshot = (issue: LinearIssue): Record<string, unknown> => ({
   identifier: issue.identifier,
   title: issue.title,
   url: issue.url,
-  description: issue.description ?? "",
+  description: truncateText(issue.description ?? "", MAX_DESCRIPTION_LENGTH),
   priority: {
     value: issue.priority,
     label: issue.priorityLabel ?? null
@@ -20,25 +18,31 @@ export const buildIssueSnapshot = (issue: LinearIssue): Record<string, unknown> 
     name: issue.state.name,
     type: issue.state.type ?? null
   },
-  team: issue.team,
   labels: issue.labels.nodes.map(formatLabel),
-  assignee: issue.assignee ? personSnapshot(issue.assignee) : null,
-  creator: issue.creator ? personSnapshot(issue.creator) : null,
-  project: issue.project ? { id: issue.project.id, name: issue.project.name } : null,
-  cycle: issue.cycle ? { id: issue.cycle.id, name: issue.cycle.name } : null,
-  createdAt: issue.createdAt,
+  team: {
+    key: issue.team.key,
+    name: issue.team.name
+  },
+  assignee: issue.assignee?.name ?? null,
+  project: issue.project?.name ?? null,
+  cycle: issue.cycle?.name ?? null,
   updatedAt: issue.updatedAt,
-  recentComments: issue.comments?.nodes.map((comment) => ({
-    id: comment.id,
-    body: comment.body,
+  recentComments: latestComments(issue).map((comment) => ({
+    body: truncateText(comment.body, MAX_COMMENT_LENGTH),
     createdAt: comment.createdAt,
-    updatedAt: comment.updatedAt,
-    user: comment.user ? personSnapshot(comment.user) : null
-  })) ?? []
+    user: comment.user?.name ?? null
+  }))
 })
 
-const personSnapshot = (person: Person): Record<string, string | null> => ({
-  id: person.id,
-  name: person.name,
-  email: person.email ?? null
-})
+const latestComments = (issue: LinearIssue) =>
+  [...(issue.comments?.nodes ?? [])]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, MAX_RECENT_COMMENTS)
+
+const truncateText = (value: string, maxLength: number): string => {
+  if (value.length <= maxLength) {
+    return value
+  }
+
+  return `${value.slice(0, maxLength)}\n\n[truncated ${value.length - maxLength} characters]`
+}

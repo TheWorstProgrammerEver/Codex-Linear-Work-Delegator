@@ -16,6 +16,7 @@ export interface Config {
   defaultSandbox: string
   codexBin: string
   codexCwd: string
+  codexExecMode: CodexExecMode
   codexExtraArgs: string[]
   stateDir: string
   waitTimeoutMs: number
@@ -24,6 +25,8 @@ export interface Config {
   dryRun: boolean
   noSpawn: boolean
 }
+
+export type CodexExecMode = "attached" | "detached"
 
 export interface CliOptions {
   envFiles: string[]

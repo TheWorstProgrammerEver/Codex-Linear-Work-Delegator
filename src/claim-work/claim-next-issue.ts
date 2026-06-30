@@ -1,4 +1,5 @@
 import { LinearClient } from "../linear.js"
+import { checkAbandonedRunningWork } from "./abandoned-running-work.js"
 import { acquireLock } from "../lock.js"
 import { getCurrentState } from "../state.js"
 import type { Config } from "../env/types.js"
@@ -27,6 +28,8 @@ async function claimNextIssueWithLock(config: Config): Promise<LinearIssue | nul
   }
 
   const linear = new LinearClient(config)
+  if (await checkAbandonedRunningWork(config, linear)) return null
+
   const nextIssue = (await linear.getCandidateIssues())[0]
   if (!nextIssue) {
     console.log("No eligible Linear issues found.")
