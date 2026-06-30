@@ -43,18 +43,20 @@ test("startup health check comments on abandoned direct-agent running work", asy
     comments: []
   })
 
-  const count = await checkAbandonedRunningWork(baseConfig({ stateDir }), {
-    getRunningIssues: async () => [issue],
-    getIssue: async () => issue,
-    createComment: async (issueId, body) => comments.push({ issueId, body })
-  })
+  try {
+    const count = await checkAbandonedRunningWork(baseConfig({ stateDir }), {
+      getRunningIssues: async () => [issue],
+      getIssue: async () => issue,
+      createComment: async (issueId, body) => comments.push({ issueId, body })
+    })
 
-  rmSync(stateDir, { recursive: true, force: true })
-
-  assert.equal(count, 1)
-  assert.equal(comments[0].issueId, "issue-1")
-  assert.match(comments[0].body, /Startup health check:/)
-  assert.match(comments[0].body, /I am not changing status, killing processes, or assuming failure/)
+    assert.equal(count, 1)
+    assert.equal(comments[0].issueId, "issue-1")
+    assert.match(comments[0].body, /Startup health check:/)
+    assert.match(comments[0].body, /I am not changing status, killing processes, or assuming failure/)
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
 })
 
 test("abandoned-work warning logic skips active and already-warned issues", () => {
@@ -88,16 +90,18 @@ test("startup health check only warns once for abandoned work", async () => {
     comments: [comment("Startup health check: already warned.")]
   })
 
-  const count = await checkAbandonedRunningWork(baseConfig({ stateDir }), {
-    getRunningIssues: async () => [issue],
-    getIssue: async () => issue,
-    createComment: async (issueId, body) => comments.push({ issueId, body })
-  })
+  try {
+    const count = await checkAbandonedRunningWork(baseConfig({ stateDir }), {
+      getRunningIssues: async () => [issue],
+      getIssue: async () => issue,
+      createComment: async (issueId, body) => comments.push({ issueId, body })
+    })
 
-  rmSync(stateDir, { recursive: true, force: true })
-
-  assert.equal(count, 0)
-  assert.deepEqual(comments, [])
+    assert.equal(count, 0)
+    assert.deepEqual(comments, [])
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
 })
 
 test("agent:any warning uses latest claim comment owner", () => {
@@ -143,7 +147,7 @@ const baseConfig = (overrides = {}) => ({
   codexCwd: process.cwd(),
   codexExecMode: "attached",
   codexExtraArgs: [],
-  stateDir: mkdtempSync(join(tmpdir(), "codex-linear-state-")),
+  stateDir: join(tmpdir(), "codex-linear-test-unused-state"),
   waitTimeoutMs: 60_000,
   lockStaleMs: 600_000,
   fetchLimit: 50,

@@ -72,7 +72,7 @@ const baseConfig = (overrides = {}) => ({
   codexCwd: process.cwd(),
   codexExecMode: "attached",
   codexExtraArgs: [],
-  stateDir: mkdtempSync(join(tmpdir(), "codex-linear-state-")),
+  stateDir: join(tmpdir(), "codex-linear-test-unused-state"),
   waitTimeoutMs: 60_000,
   lockStaleMs: 600_000,
   fetchLimit: 50,
