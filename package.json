@@ -9,7 +9,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json && npm run copy-assets && chmod +x dist/cli.js",
     "check": "tsc -p tsconfig.json --noEmit",
-    "copy-assets": "cp src/cli/help.txt dist/cli/help.txt && cp src/codex/prompt.md dist/codex/prompt.md && cp src/linear/queries/*.graphql dist/linear/queries/",
+    "copy-assets": "cp src/cli/help.txt dist/cli/help.txt && cp src/claim-work/abandoned-running-work-comment.md dist/claim-work/abandoned-running-work-comment.md && cp src/codex/prompt.md dist/codex/prompt.md && cp src/linear/queries/*.graphql dist/linear/queries/",
     "test": "npm run build && node --test test/*.test.mjs",
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts"

@@ -1,5 +1,6 @@
 import { matchesLabel } from "../linear/labels.js"
 import { getCurrentState } from "../state.js"
+import { renderTemplateFile } from "../template.js"
 import type { Config } from "../env/types.js"
 import type { LinearClient } from "../linear.js"
 import type { LinearComment, LinearIssue } from "../linear/types.js"
@@ -54,13 +55,13 @@ async function getDetailedHealthCheckIssues(config: Config, linear: LinearClient
 }
 
 function buildAbandonedRunningWorkComment(config: Config, issue: LinearIssue): string {
-  return [
-    `${HEALTH_WARNING_MARKER} ${issue.identifier} is still in ${config.runningStatus} for agent ${config.agentId}, but this host has no active local worker state/process for it.`,
-    "",
-    "Please review whether the prior Codex run completed, is still externally active, or needs manual recovery. I am not changing status, killing processes, or assuming failure.",
-    "",
-    `\u2014 ${config.agentId}.`
-  ].join("\n")
+  return renderTemplateFile(new URL("./abandoned-running-work-comment.md", import.meta.url), {
+    healthWarningMarker: HEALTH_WARNING_MARKER,
+    identifier: issue.identifier,
+    runningStatus: config.runningStatus,
+    agentId: config.agentId,
+    signoff: `\u2014 ${config.agentId}`
+  })
 }
 
 const hasAgentSpecificLabel = (issue: LinearIssue, agentId: string): boolean =>
