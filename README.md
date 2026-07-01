@@ -52,6 +52,8 @@ Recommended labels:
 - `agent:model:gpt-5.5`: use the strong/default model.
 - `agent:model:gpt-5.4-mini`: use the cheaper/faster model for light work.
 - `agent:reasoning:high`: pass `model_reasoning_effort` to Codex for this issue.
+- `agent:speed:fast`: request Codex Fast mode for this issue.
+- `agent:speed:standard`: force Fast mode off for this issue.
 - Optional later: `agent:sandbox:workspace-write` or `agent:sandbox:danger-full-access`.
 
 An issue is eligible when:
@@ -144,8 +146,19 @@ Issue labels can override Codex launch options:
 ```text
 agent:model:gpt-5.4-mini
 agent:reasoning:low
+agent:speed:standard
 agent:sandbox:workspace-write
 ```
+
+Speed labels are per-issue Codex CLI overrides:
+
+- no `agent:speed:*` label: pass no speed or service-tier override, so the host `config.toml` defaults apply;
+- `agent:speed:fast`: pass `--enable fast_mode` and `-c service_tier="fast"`;
+- `agent:speed:standard`: pass `--disable fast_mode` and no `service_tier` override.
+
+Use at most one speed label. Conflicting or unsupported `agent:speed:*` labels cause the delegator to leave a Linear comment, move the issue to `Blocked`, and skip spawning Codex.
+
+Fast mode is a service-tier override for models that support it. This delegator currently allows Fast mode for `gpt-5.5` and `gpt-5.4`; `gpt-5.3-codex-spark` is a separate model label, not Fast mode. If an issue requests `agent:speed:fast` with a model that does not support Fast mode, the delegator blocks the issue instead of silently falling back.
 
 `CODEX_LINEAR_CODEX_EXTRA_ARGS` is appended after label-derived options, so static env args can intentionally override label-derived Codex config.
 

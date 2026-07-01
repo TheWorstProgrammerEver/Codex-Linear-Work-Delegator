@@ -86,6 +86,12 @@ export class LinearClient {
     return claimed
   }
 
+  async blockIssue(issue: LinearIssue, body: string): Promise<void> {
+    const blockedStateId = await this.getWorkflowStateId(issue.team.key, this.config.blockedStatus)
+    await this.updateIssueState(issue.id, blockedStateId)
+    await this.createComment(issue.id, body)
+  }
+
   async getIssue(issueId: string): Promise<LinearIssue> {
     const data = await this.api.request<GetIssueResponse>(getIssueQuery, { id: issueId })
     return data.issue
