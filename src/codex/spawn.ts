@@ -26,7 +26,7 @@ export async function spawnCodexForIssue(config: Config, issue: LinearIssue): Pr
   const pid = await waitForChildStart(child)
   const currentState = buildCurrentState(issue, pid, launchOptions.model, logFile)
   writeCurrentState(config, currentState)
-  logSpawn(config, currentState, launchOptions.sandbox, launchOptions.reasoningEffort)
+  logSpawn(config, currentState, launchOptions.sandbox, launchOptions.reasoningEffort, launchOptions.speed)
 
   await waitForChildOrTimeout(config, currentState.pid, child)
 }
@@ -46,8 +46,9 @@ const buildCurrentState = (issue: LinearIssue, pid: number, model: string, logFi
   logFile
 })
 
-function logSpawn(config: Config, state: CurrentState, sandbox: string, reasoningEffort?: string): void {
+function logSpawn(config: Config, state: CurrentState, sandbox: string, reasoningEffort?: string, speed?: string): void {
   const reasoning = reasoningEffort ? ` reasoning=${reasoningEffort}` : ""
-  console.log(`Spawned Codex pid=${state.pid} mode=${config.codexExecMode} model=${state.model} sandbox=${sandbox}${reasoning} issue=${state.identifier}`)
+  const speedOption = speed ? ` speed=${speed}` : ""
+  console.log(`Spawned Codex pid=${state.pid} mode=${config.codexExecMode} model=${state.model} sandbox=${sandbox}${reasoning}${speedOption} issue=${state.identifier}`)
   console.log(`Log: ${state.logFile}`)
 }

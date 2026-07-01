@@ -1,6 +1,8 @@
 import { spawnCodexForIssue } from "../codex.js"
 import { claimNextIssue } from "../claim-work/claim-next-issue.js"
+import { InvalidCodexLaunchOptionsError } from "../codex/options.js"
 import { loadConfig, parseArgs } from "../env.js"
+import { LinearClient } from "../linear.js"
 import { printHelp } from "./help.js"
 
 export async function runCli(argv: string[], cwd: string): Promise<void> {
@@ -20,5 +22,22 @@ export async function runCli(argv: string[], cwd: string): Promise<void> {
     return
   }
 
-  await spawnCodexForIssue(config, claimedIssue)
+  try {
+    await spawnCodexForIssue(config, claimedIssue)
+  } catch (error) {
+    if (!(error instanceof InvalidCodexLaunchOptionsError)) throw error
+
+    const body = [
+      "Could not start Codex for this issue because the Linear launch labels are invalid.",
+      "",
+      error.message,
+      "",
+      `I moved the issue to \`${config.blockedStatus}\` so the labels/model can be corrected before retrying.`,
+      "",
+      `— ${config.agentId}.`
+    ].join("\n")
+
+    await new LinearClient(config).blockIssue(claimedIssue, body)
+    console.error(error.message)
+  }
 }
