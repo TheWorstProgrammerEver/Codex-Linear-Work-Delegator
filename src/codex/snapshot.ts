@@ -1,4 +1,5 @@
 import { formatLabel } from "../linear/labels.js"
+import { getIssueDependencies } from "../linear/dependencies.js"
 import type { LinearIssue } from "../linear/types.js"
 
 const MAX_DESCRIPTION_LENGTH = 4_000
@@ -27,6 +28,7 @@ export const buildIssueSnapshot = (issue: LinearIssue): Record<string, unknown> 
   project: issue.project?.name ?? null,
   cycle: issue.cycle?.name ?? null,
   updatedAt: issue.updatedAt,
+  dependencies: getIssueDependencies(issue),
   recentComments: latestComments(issue).map((comment) => ({
     body: truncateText(comment.body, MAX_COMMENT_LENGTH),
     createdAt: comment.createdAt,

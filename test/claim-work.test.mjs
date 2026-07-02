@@ -132,6 +132,93 @@ test("agent:any warning uses latest claim comment owner", () => {
   assert.deepEqual(warnings.map((issue) => issue.id), ["claimed-by-this-agent"])
 })
 
+test("claim skips blocked candidates and claims the next eligible issue", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-dependency-"))
+  const blocked = linearIssue({
+    id: "blocked",
+    identifier: "RYA-1",
+    state: workflowState("ready", "Waiting For Agent", "unstarted"),
+    labels: [agentLabel("daedalus")],
+    inverseRelations: [
+      blocksRelation(
+        dependencyIssue("RYA-0", workflowState("running", "Agent In Progress", "started")),
+        "RYA-1"
+      )
+    ]
+  })
+  const claimable = linearIssue({
+    id: "claimable",
+    identifier: "RYA-2",
+    state: workflowState("ready", "Waiting For Agent", "unstarted"),
+    labels: [agentLabel("daedalus")]
+  })
+  const comments = []
+  const updates = []
+  const logs = []
+  const originalFetch = globalThis.fetch
+  const originalLog = console.log
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body)
+    if (body.query.includes("query CandidateIssues")) {
+      return jsonResponse({ data: { issues: { nodes: [blocked, claimable] } } })
+    }
+    if (body.query.includes("query WorkflowStates")) {
+      return jsonResponse({
+        data: {
+          workflowStates: {
+            nodes: [workflowState("running", "Agent In Progress", "started", claimable.team)]
+          }
+        }
+      })
+    }
+    if (body.query.includes("mutation IssueUpdate")) {
+      updates.push(body.variables)
+      return jsonResponse({
+        data: {
+          issueUpdate: {
+            success: true,
+            issue: {
+              id: "claimable",
+              identifier: "RYA-2",
+              state: workflowState("running", "Agent In Progress", "started")
+            }
+          }
+        }
+      })
+    }
+    if (body.query.includes("mutation CommentCreate")) {
+      comments.push(body.variables.input)
+      return jsonResponse({ data: { commentCreate: { success: true, comment: { id: "comment-1" } } } })
+    }
+    if (body.query.includes("query GetIssue")) {
+      return jsonResponse({
+        data: {
+          issue: {
+            ...claimable,
+            state: workflowState("running", "Agent In Progress", "started")
+          }
+        }
+      })
+    }
+    throw new Error(`Unexpected query: ${body.query}`)
+  }
+  console.log = (message) => logs.push(String(message))
+
+  try {
+    const result = await claimNextIssue(baseConfig({ stateDir }))
+
+    assert.equal(result.identifier, "RYA-2")
+    assert.deepEqual(updates.map((update) => update.id), ["claimable"])
+    assert.equal(comments.length, 1)
+    assert.match(logs.join("\n"), /Skipping RYA-1; blocked by unresolved dependencies: RYA-0/)
+    assert.match(logs.join("\n"), /Selected RYA-2/)
+  } finally {
+    globalThis.fetch = originalFetch
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
 const baseConfig = (overrides = {}) => ({
   linearApiKey: "test-key",
   linearApiUrl: "https://linear.example/graphql",
@@ -160,7 +247,10 @@ const linearIssue = ({
   id = "issue-1",
   identifier = "RYA-1",
   labels = [],
-  comments = []
+  comments = [],
+  state = workflowState("state-1", "Agent In Progress", "started"),
+  relations = [],
+  inverseRelations = []
 } = {}) => ({
   id,
   identifier,
@@ -169,9 +259,11 @@ const linearIssue = ({
   priority: 2,
   createdAt: "2026-06-29T09:00:00.000Z",
   updatedAt: "2026-06-29T09:00:00.000Z",
-  state: { id: "state-1", name: "Agent In Progress" },
+  state,
   labels: { nodes: labels },
   comments: { nodes: comments },
+  relations: { nodes: relations },
+  inverseRelations: { nodes: inverseRelations },
   team: { id: "team-1", key: "RYA", name: "Ryan Hayward" }
 })
 
@@ -187,3 +279,25 @@ const comment = (body, createdAt = "2026-06-29T09:00:00.000Z") => ({
   createdAt,
   updatedAt: createdAt
 })
+
+const workflowState = (id, name, type, team = null) => ({ id, name, type, team })
+
+const blocksRelation = (sourceIssue, targetIdentifier) => ({
+  id: `relation-${sourceIssue.identifier}-${targetIdentifier}`,
+  type: "blocks",
+  issue: sourceIssue,
+  relatedIssue: dependencyIssue(targetIdentifier, workflowState("ready", "Waiting For Agent", "unstarted"))
+})
+
+const dependencyIssue = (identifier, state) => ({
+  identifier,
+  title: `Issue ${identifier}`,
+  url: `https://linear.app/example/${identifier}`,
+  state
+})
+
+const jsonResponse = (body) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  })

@@ -14,3 +14,19 @@ assignee { id name email }
 creator { id name email }
 project { id name }
 cycle { id name }
+relations(first: 50) {
+  nodes {
+    id
+    type
+    issue { identifier title url state { id name type } }
+    relatedIssue { identifier title url state { id name type } }
+  }
+}
+inverseRelations(first: 50) {
+  nodes {
+    id
+    type
+    issue { identifier title url state { id name type } }
+    relatedIssue { identifier title url state { id name type } }
+  }
+}
