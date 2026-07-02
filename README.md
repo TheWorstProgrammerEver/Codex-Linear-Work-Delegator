@@ -60,11 +60,19 @@ An issue is eligible when:
 
 - its status matches `CODEX_LINEAR_READY_STATUS`;
 - it has one of `CODEX_LINEAR_AGENT_LABELS`;
+- it is not blocked by unresolved Linear dependency relations;
 - it is not already marked busy in local worker state.
 
 Linear may display/create this as a label group named `agent` with child labels such as `daedalus` or `any`. The CLI supports both forms: exact flat labels like `daedalus`, and grouped labels configured as `agent:daedalus`.
 
 The CLI chooses the highest priority issue first, then oldest created issue.
+
+Linear dependency relations are enforced before claim. If a ready candidate is
+blocked by another issue whose status type is not `completed` or `canceled`, the
+CLI logs the blocker identifiers, skips that candidate, and keeps scanning for
+claimable work. Issues that only block downstream work remain claimable; those
+downstream dependencies are included in the Codex prompt snapshot so the worker
+understands what completion may unblock.
 
 ## Good Issue Shape
 
@@ -228,7 +236,7 @@ When an issue is claimed, the CLI:
 1. checks for likely abandoned `Agent In Progress` issues for this agent and comments for manual review without changing their status;
 2. moves one eligible issue to `Agent In Progress`;
 3. adds a concise claim comment;
-4. fetches a compact claim-time issue snapshot with bounded description/comment text and lightweight status, label, team, assignee, project, and cycle context;
+4. fetches a compact claim-time issue snapshot with bounded description/comment text and lightweight status, label, team, assignee, project, cycle, and dependency context;
 5. writes local state under `CODEX_LINEAR_STATE_DIR`;
 6. spawns `codex exec` for the issue with that compact fallback snapshot in the prompt.
 

@@ -2,6 +2,7 @@ import { LinearClient } from "../linear.js"
 import { checkAbandonedRunningWork } from "./abandoned-running-work.js"
 import { acquireLock } from "../lock.js"
 import { getCurrentState } from "../state.js"
+import { getUnresolvedBlockers } from "../linear/dependencies.js"
 import type { Config } from "../env/types.js"
 import type { LinearIssue } from "../linear/types.js"
 
@@ -30,7 +31,16 @@ async function claimNextIssueWithLock(config: Config): Promise<LinearIssue | nul
   const linear = new LinearClient(config)
   if (await checkAbandonedRunningWork(config, linear)) return null
 
-  const nextIssue = (await linear.getCandidateIssues())[0]
+  const nextIssue = (await linear.getCandidateIssues()).find((issue) => {
+    const blockers = getUnresolvedBlockers(issue)
+    if (blockers.length === 0) return true
+
+    console.log(
+      `Skipping ${issue.identifier}; blocked by unresolved dependencies: ${blockers.map((blocker) => blocker.identifier).join(", ")}.`
+    )
+    return false
+  })
+
   if (!nextIssue) {
     console.log("No eligible Linear issues found.")
     return null

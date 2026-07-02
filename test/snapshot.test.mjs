@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { buildPrompt } from "../dist/codex/prompt.js"
 import { buildIssueSnapshot } from "../dist/codex/snapshot.js"
 
 test("issue snapshot keeps compact fallback context", () => {
@@ -19,6 +20,7 @@ test("issue snapshot keeps compact fallback context", () => {
     "project",
     "cycle",
     "updatedAt",
+    "dependencies",
     "recentComments"
   ])
   assert.deepEqual(snapshot.team, { key: "RYA", name: "Ryan Hayward" })
@@ -28,6 +30,39 @@ test("issue snapshot keeps compact fallback context", () => {
   assert.deepEqual(snapshot.labels, ["agent:daedalus"])
   assert.equal(JSON.stringify(snapshot).includes("worker@example.com"), false)
   assert.equal(JSON.stringify(snapshot).includes("assignee-1"), false)
+})
+
+test("issue snapshot includes compact dependency metadata", () => {
+  const snapshot = buildIssueSnapshot(linearIssue({
+    inverseRelations: [blocksRelation(dependencyIssue("RYA-0", "Agent In Progress", "started"), "RYA-1")],
+    relations: [blocksRelation(dependencyIssue("RYA-1", "Agent In Progress", "started"), "RYA-2")]
+  }))
+
+  assert.deepEqual(snapshot.dependencies, [
+    {
+      direction: "blockedBy",
+      identifier: "RYA-0",
+      title: "Issue RYA-0",
+      url: "https://linear.app/example/RYA-0",
+      status: { name: "Agent In Progress", type: "started" }
+    },
+    {
+      direction: "blocks",
+      identifier: "RYA-2",
+      title: "Issue RYA-2",
+      url: "https://linear.app/example/RYA-2",
+      status: { name: "Agent In Progress", type: "started" }
+    }
+  ])
+})
+
+test("spawned prompt instructs agents to refresh and honor dependency blockers", () => {
+  const prompt = buildPrompt(baseConfig(), linearIssue())
+
+  assert.match(prompt, /dependency relations immediately/)
+  assert.match(prompt, /unresolved issues blocking this one/)
+  assert.match(prompt, /move this issue to "Blocked"/)
+  assert.match(prompt, /do not stop merely because downstream work is waiting/)
 })
 
 test("issue snapshot truncates description and latest comments", () => {
@@ -51,7 +86,9 @@ test("issue snapshot truncates description and latest comments", () => {
 
 const linearIssue = ({
   description = "Do the work.",
-  comments = [comment("Most recent comment.", "2026-06-29T09:00:00.000Z", "Ryan")]
+  comments = [comment("Most recent comment.", "2026-06-29T09:00:00.000Z", "Ryan")],
+  relations = [],
+  inverseRelations = []
 } = {}) => ({
   id: "issue-1",
   identifier: "RYA-1",
@@ -68,6 +105,8 @@ const linearIssue = ({
       { id: "label-1", name: "daedalus", parent: { id: "agent", name: "agent" } }
     ]
   },
+  relations: { nodes: relations },
+  inverseRelations: { nodes: inverseRelations },
   team: { id: "team-1", key: "RYA", name: "Ryan Hayward" },
   comments: { nodes: comments },
   assignee: { id: "assignee-1", name: "Worker", email: "worker@example.com" },
@@ -82,4 +121,24 @@ const comment = (body, createdAt, userName) => ({
   createdAt,
   updatedAt: createdAt,
   user: { id: `user-${userName}`, name: userName, email: `${userName}@example.com` }
+})
+
+const blocksRelation = (sourceIssue, targetIdentifier) => ({
+  id: `relation-${sourceIssue.identifier}-${targetIdentifier}`,
+  type: "blocks",
+  issue: sourceIssue,
+  relatedIssue: dependencyIssue(targetIdentifier, "Agent In Progress", "started")
+})
+
+const dependencyIssue = (identifier, stateName, stateType) => ({
+  identifier,
+  title: `Issue ${identifier}`,
+  url: `https://linear.app/example/${identifier}`,
+  state: { id: `state-${stateType}`, name: stateName, type: stateType }
+})
+
+const baseConfig = () => ({
+  agentId: "daedalus",
+  reviewStatus: "In Review",
+  blockedStatus: "Blocked"
 })
