@@ -85,6 +85,8 @@ Put the work in the Linear issue itself:
 - constraints and non-goals;
 - expected output, such as local change, commit, PR, or notes only.
 
+For code-changing repository work, the default expected output is a pull request. Before moving the Linear issue to `In Review`, the spawned Codex worker is expected to create or use an issue branch, commit the change, push the branch, open or update a PR, and include the PR URL in the Linear completion comment. Use local-only, no-PR, notes-only, research-only, or another artifact only when the issue explicitly says so.
+
 If the agent blocks, resolve the blocker and move the issue back to `Waiting For Agent`.
 
 Example:
@@ -168,6 +170,8 @@ Use at most one speed label. Conflicting or unsupported `agent:speed:*` labels c
 
 Fast mode is a service-tier override for models that support it. This delegator currently allows Fast mode for `gpt-5.5` and `gpt-5.4`; `gpt-5.3-codex-spark` is a separate model label, not Fast mode. If an issue requests `agent:speed:fast` with a model that does not support Fast mode, the delegator blocks the issue instead of silently falling back.
 
+Model labels, including `agent:model:gpt-5.3-codex-spark`, only select the Codex runtime. They are not a substitute for explicit completion criteria in the prompt or issue. Small or fast-model code tasks still need the branch, commit, push, PR, verification, and Linear completion-comment contract unless the issue explicitly requests a different artifact.
+
 `CODEX_LINEAR_CODEX_EXTRA_ARGS` is appended after label-derived options, so static env args can intentionally override label-derived Codex config.
 
 `CODEX_LINEAR_CODEX_EXEC_MODE` controls the Codex process lifecycle:
@@ -246,6 +250,8 @@ Codex is instructed to update Linear when complete or blocked:
 
 - move to `In Review` with a summary when complete;
 - move to `Blocked` with blocker notes when blocked.
+
+For PR-producing work, the spawned prompt directs workers to `$HOME/codex-notes/runbooks/github-app-pr-workflow.md` when present and names the preferred GitHub App helper path: `codex-github-token --expires-at`, `codex-gh` for GitHub API/PR state, and `GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=$HOME/.local/bin/codex-github-askpass git push ...` for authenticated HTTPS Git operations. If a push returns `403`, workers should verify token minting, installation repository access, askpass configuration, and a dry-run push before concluding that repository access is absent.
 
 ## Notes
 
