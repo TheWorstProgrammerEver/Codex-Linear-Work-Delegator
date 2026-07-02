@@ -20,8 +20,8 @@ Create `.env.local` with a Linear API key:
 ```dotenv
 LINEAR_API_KEY=<your-linear-api-key>
 CODEX_LINEAR_TEAM_KEY=RYA
-CODEX_LINEAR_AGENT_ID=codex-agent
-CODEX_LINEAR_AGENT_LABELS=agent:codex-agent,agent:any
+CODEX_LINEAR_AGENT_ID=my-agent
+CODEX_LINEAR_AGENT_LABELS=agent:my-agent,agent:any
 CODEX_LINEAR_CODEX_EXEC_MODE=attached
 ```
 
@@ -48,7 +48,7 @@ Recommended statuses:
 
 Recommended labels:
 
-- `agent:<agent-name>`: one named agent host may pick it up.
+- `agent:my-agent`: one named agent may pick it up.
 - `agent:any`: any compatible local agent may pick it up.
 - `agent:model:gpt-5.5`: use the strong/default model.
 - `agent:model:gpt-5.4-mini`: use the cheaper/faster model for light work.
@@ -64,7 +64,7 @@ An issue is eligible when:
 - it is not blocked by unresolved Linear dependency relations;
 - it is not already marked busy in local worker state.
 
-Linear may display/create this as a label group named `agent` with child labels such as the agent name or `any`. The CLI supports both forms: exact flat labels like `codex-agent`, and grouped labels configured as `agent:codex-agent`.
+Linear may display/create this as a label group named `agent` with child labels such as the agent name or `any`. The CLI supports both forms: exact flat labels like `my-agent`, and grouped labels configured as `agent:my-agent`.
 
 The CLI chooses the highest priority issue first, then oldest created issue.
 
@@ -127,8 +127,8 @@ Create `.env.local`:
 ```bash
 LINEAR_API_KEY=<your-linear-api-key>
 CODEX_LINEAR_TEAM_KEY=<linear-team-key>
-CODEX_LINEAR_AGENT_ID=codex-agent
-CODEX_LINEAR_AGENT_LABELS=agent:codex-agent,agent:any
+CODEX_LINEAR_AGENT_ID=my-agent
+CODEX_LINEAR_AGENT_LABELS=agent:my-agent,agent:any
 ```
 
 Do not commit API keys.
@@ -199,7 +199,7 @@ EnvironmentFile=%h/.config/codex-linear-work-delegator/env
 ExecStart=/usr/bin/npm start -- --env-file %h/.config/codex-linear-work-delegator/env
 TimeoutStartSec=infinity
 KillMode=control-group
-User=codex-agent
+User=my-user
 ```
 
 Example timer:
