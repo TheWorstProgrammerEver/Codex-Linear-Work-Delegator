@@ -243,7 +243,7 @@ Codex is instructed to update Linear when complete or blocked:
 - move to `In Review` with a summary when complete;
 - move to `Blocked` with blocker notes when blocked.
 
-For PR-producing work on Daedalus, the spawned prompt points workers to `/home/daedalus/codex-notes/runbooks/github-app-pr-workflow.md` and names the preferred GitHub App helper path: `codex-github-token --expires-at`, `codex-gh` for GitHub API/PR state, and `GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/home/daedalus/.local/bin/codex-github-askpass git push ...` for authenticated HTTPS Git operations. If a push returns `403`, workers should verify token minting, installation repository access, askpass configuration, and a dry-run push before concluding that repository access is absent.
+For PR-producing work, the spawned prompt directs workers to `$HOME/codex-notes/runbooks/github-app-pr-workflow.md` when present and names the preferred GitHub App helper path: `codex-github-token --expires-at`, `codex-gh` for GitHub API/PR state, and `GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=$HOME/.local/bin/codex-github-askpass git push ...` for authenticated HTTPS Git operations. If a push returns `403`, workers should verify token minting, installation repository access, askpass configuration, and a dry-run push before concluding that repository access is absent.
 
 ## Notes
 

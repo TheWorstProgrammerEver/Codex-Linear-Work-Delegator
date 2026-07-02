@@ -22,17 +22,20 @@ test("generated prompt surfaces GitHub App auth diagnostics", () => {
 
   assert.match(
     prompt,
-    /\/home\/daedalus\/codex-notes\/runbooks\/github-app-pr-workflow\.md/
+    /\$HOME\/codex-notes\/runbooks\/github-app-pr-workflow\.md/
   )
   assert.match(prompt, /codex-github-token --expires-at/)
   assert.match(prompt, /CODEX_GH_REPO=OWNER\/REPO codex-gh/)
   assert.match(
     prompt,
-    /GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=\/home\/daedalus\/\.local\/bin\/codex-github-askpass git push/
+    /GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=\$HOME\/\.local\/bin\/codex-github-askpass git push/
   )
   assert.match(prompt, /If an authenticated push returns `403`/)
   assert.match(prompt, /installation repository list/)
+  assert.match(prompt, /GIT_ASKPASS` points to an installed `codex-github-askpass` helper/)
   assert.match(prompt, /git push --dry-run origin HEAD:refs\/heads\/codex-auth-dry-run/)
+  assert.doesNotMatch(prompt, /Daedalus/)
+  assert.doesNotMatch(prompt, /\/home\/daedalus/)
 })
 
 const baseConfig = (overrides = {}) => ({
