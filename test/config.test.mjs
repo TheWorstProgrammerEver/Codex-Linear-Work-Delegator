@@ -10,7 +10,9 @@ const withTempConfig = (contents, callback) => {
   const cwd = mkdtempSync(join(tmpdir(), "codex-linear-config-"))
   writeFileSync(join(cwd, ".env.defaults"), contents)
   const restoreEnv = cleanEnv([
+    "CODEX_LINEAR_CODEX_CWD",
     "CODEX_LINEAR_CODEX_EXEC_MODE",
+    "CODEX_LINEAR_STATE_DIR",
     "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"
   ])
 
@@ -56,6 +58,26 @@ test("config accepts explicit detached execution mode and wait timeout", () => {
 
     assert.equal(config.codexExecMode, "detached")
     assert.equal(config.waitTimeoutMs, 7_000)
+  })
+})
+
+test("config expands home placeholders for local paths", () => {
+  withTempConfig([
+    "LINEAR_API_KEY=test-key",
+    "CODEX_LINEAR_CODEX_CWD=$HOME",
+    "CODEX_LINEAR_STATE_DIR=${HOME}/.local/state/codex-linear-work-delegator"
+  ].join("\n"), (cwd) => {
+    const restoreEnv = cleanEnv(["HOME"])
+    process.env.HOME = join(cwd, "my-user")
+
+    try {
+      const config = loadConfig({ envFiles: [], flags: {} }, cwd)
+
+      assert.equal(config.codexCwd, join(cwd, "my-user"))
+      assert.equal(config.stateDir, join(cwd, "my-user", ".local", "state", "codex-linear-work-delegator"))
+    } finally {
+      restoreEnv()
+    }
   })
 })
 

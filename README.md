@@ -48,7 +48,7 @@ Recommended statuses:
 
 Recommended labels:
 
-- `agent:my-agent`: one named agent may pick it up.
+- `agent:my-agent`: the agent named `my-agent` may pick it up.
 - `agent:any`: any compatible local agent may pick it up.
 - `agent:model:gpt-5.5`: use the strong/default model.
 - `agent:model:gpt-5.4-mini`: use the cheaper/faster model for light work.
@@ -64,7 +64,7 @@ An issue is eligible when:
 - it is not blocked by unresolved Linear dependency relations;
 - it is not already marked busy in local worker state.
 
-Linear may display/create this as a label group named `agent` with child labels such as the agent name or `any`. The CLI supports both forms: exact flat labels like `my-agent`, and grouped labels configured as `agent:my-agent`.
+Linear may display/create this as a label group named `agent` with child labels such as the agent name (e.g. `my-agent`) or `any`. The CLI supports both forms: exact flat labels like `my-agent`, and grouped labels configured as `agent:my-agent`.
 
 The CLI chooses the highest priority issue first, then oldest created issue.
 
@@ -79,7 +79,7 @@ understands what completion may unblock.
 
 Put the work in the Linear issue itself:
 
-- repo and local path;
+- authoritative repository URL;
 - exact task;
 - acceptance criteria;
 - verification command;
@@ -93,7 +93,7 @@ If the agent blocks, resolve the blocker and move the issue back to `Waiting For
 Example:
 
 ```markdown
-Repo: $HOME/github/OWNER/Codex-Create-Agent-Boot-Drive-CLI
+Repo: https://github.com/example/repo.git
 
 Task:
 Add first-boot setup progress visibility.
