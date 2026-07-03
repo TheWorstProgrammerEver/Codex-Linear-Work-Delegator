@@ -20,7 +20,8 @@ Create `.env.local` with a Linear API key:
 ```dotenv
 LINEAR_API_KEY=<your-linear-api-key>
 CODEX_LINEAR_TEAM_KEY=RYA
-CODEX_LINEAR_AGENT_LABELS=agent:daedalus,agent:any
+CODEX_LINEAR_AGENT_ID=my-agent
+CODEX_LINEAR_AGENT_LABELS=agent:my-agent,agent:any
 CODEX_LINEAR_CODEX_EXEC_MODE=attached
 ```
 
@@ -47,7 +48,7 @@ Recommended statuses:
 
 Recommended labels:
 
-- `agent:daedalus`: this Pi may pick it up.
+- `agent:my-agent`: the agent named `my-agent` may pick it up.
 - `agent:any`: any compatible local agent may pick it up.
 - `agent:model:gpt-5.5`: use the strong/default model.
 - `agent:model:gpt-5.4-mini`: use the cheaper/faster model for light work.
@@ -63,7 +64,7 @@ An issue is eligible when:
 - it is not blocked by unresolved Linear dependency relations;
 - it is not already marked busy in local worker state.
 
-Linear may display/create this as a label group named `agent` with child labels such as `daedalus` or `any`. The CLI supports both forms: exact flat labels like `daedalus`, and grouped labels configured as `agent:daedalus`.
+Linear may display/create this as a label group named `agent` with child labels such as the agent name (e.g. `my-agent`) or `any`. The CLI supports both forms: exact flat labels like `my-agent`, and grouped labels configured as `agent:my-agent`.
 
 The CLI chooses the highest priority issue first, then oldest created issue.
 
@@ -78,7 +79,7 @@ understands what completion may unblock.
 
 Put the work in the Linear issue itself:
 
-- repo and local path;
+- authoritative repository URL;
 - exact task;
 - acceptance criteria;
 - verification command;
@@ -92,7 +93,7 @@ If the agent blocks, resolve the blocker and move the issue back to `Waiting For
 Example:
 
 ```markdown
-Repo: /home/daedalus/github/TheWorstProgrammerEver/Codex-Create-Agent-Boot-Drive-CLI
+Repo: https://github.com/example/repo.git
 
 Task:
 Add first-boot setup progress visibility.
@@ -125,9 +126,9 @@ Create `.env.local`:
 
 ```bash
 LINEAR_API_KEY=<your-linear-api-key>
-CODEX_LINEAR_TEAM_KEY=DAE
-CODEX_LINEAR_AGENT_ID=daedalus
-CODEX_LINEAR_AGENT_LABELS=agent:daedalus,agent:any
+CODEX_LINEAR_TEAM_KEY=<linear-team-key>
+CODEX_LINEAR_AGENT_ID=my-agent
+CODEX_LINEAR_AGENT_LABELS=agent:my-agent,agent:any
 ```
 
 Do not commit API keys.
@@ -193,12 +194,12 @@ Description=Codex Linear Work Delegator
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/daedalus/github/TheWorstProgrammerEver/Codex-Linear-Work-Delegator
-EnvironmentFile=/home/daedalus/.config/codex-linear-work-delegator/env
-ExecStart=/usr/bin/npm start -- --env-file /home/daedalus/.config/codex-linear-work-delegator/env
+WorkingDirectory=/opt/codex-linear-work-delegator
+EnvironmentFile=%h/.config/codex-linear-work-delegator/env
+ExecStart=/usr/bin/npm start -- --env-file %h/.config/codex-linear-work-delegator/env
 TimeoutStartSec=infinity
 KillMode=control-group
-User=daedalus
+User=my-user
 ```
 
 Example timer:
@@ -244,7 +245,7 @@ When an issue is claimed, the CLI:
 5. writes local state under `CODEX_LINEAR_STATE_DIR`;
 6. spawns `codex exec` for the issue with that compact fallback snapshot in the prompt.
 
-The startup health check treats `agent:daedalus` as directly relevant to Daedalus. For `agent:any`, it checks the latest claim comment and only warns if that comment says this agent claimed the issue. It does not mark issues failed, kill processes, or infer failure from age alone.
+The startup health check treats labels configured in `CODEX_LINEAR_AGENT_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `agent:any`, it checks the latest claim comment and only warns if that comment says this agent claimed the issue. It does not mark issues failed, kill processes, or infer failure from age alone.
 
 Codex is instructed to update Linear when complete or blocked:
 

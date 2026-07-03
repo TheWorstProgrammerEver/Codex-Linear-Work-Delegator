@@ -37,7 +37,7 @@ export function loadConfig(options: CliOptions, cwd: string): Config {
   applyFlags(merged, options.flags)
 
   const linearApiKey = required(merged, "LINEAR_API_KEY")
-  const stateDir = value(merged, "CODEX_LINEAR_STATE_DIR", `${process.env.HOME ?? "."}/.local/state/codex-linear-work-delegator`)
+  const stateDir = pathValue(merged, "CODEX_LINEAR_STATE_DIR", `${process.env.HOME ?? "."}/.local/state/codex-linear-work-delegator`)
 
   return {
     linearApiKey,
@@ -52,7 +52,7 @@ export function loadConfig(options: CliOptions, cwd: string): Config {
     defaultModel: value(merged, "CODEX_LINEAR_DEFAULT_MODEL", "gpt-5.5"),
     defaultSandbox: value(merged, "CODEX_LINEAR_DEFAULT_SANDBOX", "danger-full-access"),
     codexBin: value(merged, "CODEX_LINEAR_CODEX_BIN", "codex"),
-    codexCwd: value(merged, "CODEX_LINEAR_CODEX_CWD", process.cwd()),
+    codexCwd: pathValue(merged, "CODEX_LINEAR_CODEX_CWD", process.cwd()),
     codexExecMode: codexExecMode(merged, "CODEX_LINEAR_CODEX_EXEC_MODE", "attached"),
     codexExtraArgs: splitArgs(value(merged, "CODEX_LINEAR_CODEX_EXTRA_ARGS", "")),
     stateDir,
@@ -84,6 +84,21 @@ const optional = (env: EnvMap, key: string): string | undefined => {
 
 const value = (env: EnvMap, key: string, fallback: string): string =>
   optional(env, key) ?? fallback
+
+const pathValue = (env: EnvMap, key: string, fallback: string): string =>
+  expandHomePath(value(env, key, fallback))
+
+function expandHomePath(input: string): string {
+  const home = process.env.HOME
+  if (!home) return input
+
+  if (input === "~" || input === "$HOME" || input === "${HOME}") return home
+  if (input.startsWith("~/")) return `${home}${input.slice(1)}`
+  if (input.startsWith("$HOME/")) return `${home}${input.slice("$HOME".length)}`
+  if (input.startsWith("${HOME}/")) return `${home}${input.slice("${HOME}".length)}`
+
+  return input
+}
 
 const list = (input: string): string[] =>
   input.split(",").map((item) => item.trim()).filter(Boolean)
