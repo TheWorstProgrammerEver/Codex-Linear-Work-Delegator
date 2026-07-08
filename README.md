@@ -180,6 +180,20 @@ Model labels, including `agent:model:gpt-5.3-codex-spark`, only select the Codex
 - `attached` is the default production mode. The wrapper starts `codex exec` as a normal child process and waits until it exits. `CODEX_LINEAR_WAIT_TIMEOUT_SECONDS` is ignored in this mode.
 - `detached` preserves the older bounded-wait behavior for compatibility and testing. The wrapper detaches `codex exec`, waits up to `CODEX_LINEAR_WAIT_TIMEOUT_SECONDS`, then returns without killing the child. The child PID stays in local state so the next scheduled run can see that work is still active.
 
+## Long-Running Resumable Jobs
+
+Some Linear issues involve external work that can outlive a Codex session: large downloads, backups, imports, migrations, builds, or data-processing jobs. The spawned worker prompt tells agents not to foreground-monitor these jobs for hours. The Codex session should set up durable local execution, record recovery state, and yield once the next action is clear.
+
+Expected shape for long-running work:
+
+- run the external job with an inspectable durable runner such as `systemd-run`, a dedicated service/timer, `tmux`, or another detached host-appropriate process;
+- write a small state file that records the job purpose, phase, artifact path or job identifier, log path, resumability notes, checksum/validation plan, and exact resume/reconcile command;
+- route verbose progress to logs with quiet/non-TTY flags where possible, especially for transfer tools with progress meters;
+- add a lightweight Linear status comment before yielding control, and add periodic status comments for intentionally incomplete long-running work;
+- keep partial artifacts resumable and validate before marking the issue complete.
+
+This keeps normal coding/research issues unchanged: short work should still be completed directly by the Codex run and follow the normal PR or notes-only completion contract.
+
 ## Scheduler Shape
 
 Use a systemd timer to invoke the CLI. The installed schedule is intentionally single-worker: the service is `Type=oneshot`, stays active for the full attached Codex run, has no normal runtime timeout, and the timer uses `OnUnitInactiveSec=5min` so the next scan is scheduled only after the previous service invocation exits.
@@ -246,6 +260,8 @@ When an issue is claimed, the CLI:
 6. spawns `codex exec` for the issue with that compact fallback snapshot in the prompt.
 
 The startup health check treats labels configured in `CODEX_LINEAR_AGENT_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `agent:any`, it checks the latest claim comment and only warns if that comment says this agent claimed the issue. It does not mark issues failed, kill processes, or infer failure from age alone.
+
+When the startup health check finds an `Agent In Progress` issue without active local worker state, it comments for manual reconciliation instead of treating the work as failed. Operators or later agents should check issue comments, durable job state files, service/timer units, detached sessions, partial artifacts, and logs. If a durable job is active or resumable, leave the issue running and add a lightweight status comment with the current state and next resume/reconcile command. If the artifact validates, finish the issue normally. If recovery needs outside input, comment with the concrete blocker and move the issue to `Blocked`.
 
 Codex is instructed to update Linear when complete or blocked:
 

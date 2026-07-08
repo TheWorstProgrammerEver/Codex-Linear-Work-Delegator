@@ -38,6 +38,23 @@ test("generated prompt surfaces GitHub App auth diagnostics", () => {
   assert.doesNotMatch(prompt, /\/home\/daedalus/)
 })
 
+test("generated prompt discourages foreground monitoring of multi-hour resumable jobs", () => {
+  const prompt = buildPrompt(baseConfig(), linearIssue({
+    title: "Install large offline knowledge archive",
+    description: "Download a very large resumable archive that may take many hours."
+  }))
+
+  assert.match(prompt, /### Long-Running Resumable Jobs/)
+  assert.match(prompt, /do not spend the Codex session foreground-monitoring it/)
+  assert.match(prompt, /run the job outside the foreground Codex process/)
+  assert.match(prompt, /state file/)
+  assert.match(prompt, /quiet\/non-TTY flags/)
+  assert.match(prompt, /lightweight Linear status comment/)
+  assert.match(prompt, /periodic status comments/)
+  assert.match(prompt, /resume\/reconcile command/)
+  assert.match(prompt, /network loss/)
+})
+
 const baseConfig = (overrides = {}) => ({
   linearApiKey: "test-key",
   linearApiUrl: "https://linear.example/graphql",
@@ -62,7 +79,7 @@ const baseConfig = (overrides = {}) => ({
   ...overrides
 })
 
-const linearIssue = () => ({
+const linearIssue = (overrides = {}) => ({
   id: "issue-29",
   identifier: "RYA-29",
   title: "Update prompt completion contract",
@@ -88,5 +105,6 @@ const linearIssue = () => ({
     ]
   },
   comments: { nodes: [] },
-  team: { id: "team-1", key: "RYA", name: "Ryan Hayward" }
+  team: { id: "team-1", key: "RYA", name: "Ryan Hayward" },
+  ...overrides
 })
