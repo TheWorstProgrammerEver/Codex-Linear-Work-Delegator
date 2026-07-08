@@ -59,6 +59,7 @@ function buildAbandonedRunningWorkComment(config: Config, issue: LinearIssue): s
     healthWarningMarker: HEALTH_WARNING_MARKER,
     identifier: issue.identifier,
     runningStatus: config.runningStatus,
+    blockedStatus: config.blockedStatus,
     agentId: config.agentId,
     signoff: `\u2014 ${config.agentId}`
   })

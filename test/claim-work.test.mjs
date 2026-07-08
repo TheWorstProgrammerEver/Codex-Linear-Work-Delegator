@@ -53,6 +53,9 @@ test("startup health check comments on abandoned direct-agent running work", asy
     assert.equal(count, 1)
     assert.equal(comments[0].issueId, "issue-1")
     assert.match(comments[0].body, /Startup health check:/)
+    assert.match(comments[0].body, /active durable local job/)
+    assert.match(comments[0].body, /state files, service\/timer units, detached sessions, partial artifacts, and logs/)
+    assert.match(comments[0].body, /next resume\/reconcile command/)
     assert.match(comments[0].body, /I am not changing status, killing processes, or assuming failure/)
   } finally {
     rmSync(stateDir, { recursive: true, force: true })

@@ -44,6 +44,18 @@ If an authenticated push returns `403`, diagnose before declaring repository acc
 - confirm `GIT_ASKPASS` points to an installed `codex-github-askpass` helper;
 - retry with a dry-run push such as `GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=$HOME/.local/bin/codex-github-askpass git push --dry-run origin HEAD:refs/heads/codex-auth-dry-run`.
 
+### Long-Running Resumable Jobs
+If the issue requires a multi-hour external transfer, import, backup, migration, build, or other resumable local job, do not spend the Codex session foreground-monitoring it.
+
+Handle it as durable local work:
+- run the job outside the foreground Codex process, such as with `systemd-run`, a dedicated service/timer, `tmux`, or another inspectable detached runner appropriate for the host;
+- write a small state file that records the command purpose, current phase, local artifact path or job identifier, log path, resumability notes, and next resume/reconcile command;
+- send noisy tool progress to a log file with quiet/non-TTY flags where available instead of streaming progress meters into Codex output;
+- leave a lightweight Linear status comment before yielding control, and add periodic status comments for intentionally incomplete long-running work;
+- keep partial artifacts resumable and document checksum/validation steps needed before declaring completion.
+
+Completion or blocker reconciliation still belongs in Linear. If the durable job finishes after this Codex session exits, a later agent or operator must be able to inspect the state/logs, validate the artifact, finish the issue, or move it to "{{ blockedStatus }}" with the concrete recovery blocker. If the local artifact exists but is incomplete after network loss, resume the durable job or comment with the exact resume path; do not treat the missing Codex process as proof that the work failed.
+
 ### Termination Rules
 
 #### Success:
