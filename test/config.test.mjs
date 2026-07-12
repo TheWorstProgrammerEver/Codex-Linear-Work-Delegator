@@ -12,6 +12,7 @@ const withTempConfig = (contents, callback) => {
   const restoreEnv = cleanEnv([
     "CODEX_LINEAR_CODEX_CWD",
     "CODEX_LINEAR_CODEX_EXEC_MODE",
+    "CODEX_LINEAR_REVIEWER_LABELS",
     "CODEX_LINEAR_STATE_DIR",
     "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"
   ])
@@ -58,6 +59,29 @@ test("config accepts explicit detached execution mode and wait timeout", () => {
 
     assert.equal(config.codexExecMode, "detached")
     assert.equal(config.waitTimeoutMs, 7_000)
+  })
+})
+
+test("review config defaults to separate state, reviewer labels, and review statuses", () => {
+  withTempConfig([
+    "LINEAR_API_KEY=test-key",
+    "CODEX_LINEAR_AGENT_ID=daedalus"
+  ].join("\n"), (cwd) => {
+    const restoreEnv = cleanEnv(["HOME"])
+    process.env.HOME = join(cwd, "my-user")
+
+    try {
+      const config = loadConfig({ envFiles: [], flags: {} }, cwd, "review")
+
+      assert.equal(config.stateDir, join(cwd, "my-user", ".local", "state", "codex-linear-review-delegator"))
+      assert.deepEqual(config.reviewerLabels, ["reviewer:daedalus", "reviewer:any"])
+      assert.equal(config.reviewReadyStatus, "In Review")
+      assert.equal(config.reviewRunningStatus, "In Testing")
+      assert.equal(config.reviewPassedStatus, "Review Passed")
+      assert.equal(config.reviewReturnStatus, "Waiting For Agent")
+    } finally {
+      restoreEnv()
+    }
   })
 })
 

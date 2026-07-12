@@ -11,10 +11,15 @@ const FLAG_ENV_KEYS = [
   ["team-key", "CODEX_LINEAR_TEAM_KEY"],
   ["agent-id", "CODEX_LINEAR_AGENT_ID"],
   ["agent-labels", "CODEX_LINEAR_AGENT_LABELS"],
+  ["reviewer-labels", "CODEX_LINEAR_REVIEWER_LABELS"],
   ["ready-status", "CODEX_LINEAR_READY_STATUS"],
   ["running-status", "CODEX_LINEAR_RUNNING_STATUS"],
   ["blocked-status", "CODEX_LINEAR_BLOCKED_STATUS"],
   ["review-status", "CODEX_LINEAR_REVIEW_STATUS"],
+  ["review-ready-status", "CODEX_LINEAR_REVIEW_READY_STATUS"],
+  ["review-running-status", "CODEX_LINEAR_REVIEW_RUNNING_STATUS"],
+  ["review-passed-status", "CODEX_LINEAR_REVIEW_PASSED_STATUS"],
+  ["review-return-status", "CODEX_LINEAR_REVIEW_RETURN_STATUS"],
   ["default-model", "CODEX_LINEAR_DEFAULT_MODEL"],
   ["default-sandbox", "CODEX_LINEAR_DEFAULT_SANDBOX"],
   ["codex-bin", "CODEX_LINEAR_CODEX_BIN"],
@@ -24,10 +29,14 @@ const FLAG_ENV_KEYS = [
   ["state-dir", "CODEX_LINEAR_STATE_DIR"],
   ["wait-timeout-seconds", "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"],
   ["lock-stale-seconds", "CODEX_LINEAR_LOCK_STALE_SECONDS"],
-  ["fetch-limit", "CODEX_LINEAR_FETCH_LIMIT"]
+  ["fetch-limit", "CODEX_LINEAR_FETCH_LIMIT"],
+  ["issue-id", "CODEX_LINEAR_REVIEW_ISSUE_ID"],
+  ["artifact-url", "CODEX_LINEAR_REVIEW_ARTIFACT_URL"]
 ] as const
 
-export function loadConfig(options: CliOptions, cwd: string): Config {
+export type ConfigProfile = "work" | "review"
+
+export function loadConfig(options: CliOptions, cwd: string, profile: ConfigProfile = "work"): Config {
   const merged: EnvMap = {}
 
   mergeEnvFile(merged, resolve(cwd, ".env.defaults"), false)
@@ -37,18 +46,26 @@ export function loadConfig(options: CliOptions, cwd: string): Config {
   applyFlags(merged, options.flags)
 
   const linearApiKey = required(merged, "LINEAR_API_KEY")
-  const stateDir = pathValue(merged, "CODEX_LINEAR_STATE_DIR", `${process.env.HOME ?? "."}/.local/state/codex-linear-work-delegator`)
+  const agentId = value(merged, "CODEX_LINEAR_AGENT_ID", "anonymous")
+  const reviewStatus = value(merged, "CODEX_LINEAR_REVIEW_STATUS", "In Review")
+  const stateDir = pathValue(merged, "CODEX_LINEAR_STATE_DIR", defaultStateDir(profile))
+  const readyStatus = value(merged, "CODEX_LINEAR_READY_STATUS", "Waiting For Agent")
 
   return {
     linearApiKey,
     linearApiUrl: value(merged, "CODEX_LINEAR_API_URL", "https://api.linear.app/graphql"),
     teamKey: optional(merged, "CODEX_LINEAR_TEAM_KEY"),
-    agentId: value(merged, "CODEX_LINEAR_AGENT_ID", "anonymous"),
+    agentId,
     agentLabels: list(value(merged, "CODEX_LINEAR_AGENT_LABELS", "agent:any")),
-    readyStatus: value(merged, "CODEX_LINEAR_READY_STATUS", "Waiting For Agent"),
+    reviewerLabels: list(value(merged, "CODEX_LINEAR_REVIEWER_LABELS", `reviewer:${agentId},reviewer:any`)),
+    readyStatus,
     runningStatus: value(merged, "CODEX_LINEAR_RUNNING_STATUS", "Agent In Progress"),
     blockedStatus: value(merged, "CODEX_LINEAR_BLOCKED_STATUS", "Blocked"),
-    reviewStatus: value(merged, "CODEX_LINEAR_REVIEW_STATUS", "In Review"),
+    reviewStatus,
+    reviewReadyStatus: value(merged, "CODEX_LINEAR_REVIEW_READY_STATUS", reviewStatus),
+    reviewRunningStatus: value(merged, "CODEX_LINEAR_REVIEW_RUNNING_STATUS", "In Testing"),
+    reviewPassedStatus: value(merged, "CODEX_LINEAR_REVIEW_PASSED_STATUS", "Review Passed"),
+    reviewReturnStatus: value(merged, "CODEX_LINEAR_REVIEW_RETURN_STATUS", readyStatus),
     defaultModel: value(merged, "CODEX_LINEAR_DEFAULT_MODEL", "gpt-5.5"),
     defaultSandbox: value(merged, "CODEX_LINEAR_DEFAULT_SANDBOX", "danger-full-access"),
     codexBin: value(merged, "CODEX_LINEAR_CODEX_BIN", "codex"),
@@ -60,8 +77,18 @@ export function loadConfig(options: CliOptions, cwd: string): Config {
     lockStaleMs: seconds(merged, "CODEX_LINEAR_LOCK_STALE_SECONDS", 600),
     fetchLimit: integer(merged, "CODEX_LINEAR_FETCH_LIMIT", 50),
     dryRun: options.flags["dry-run"] === true,
-    noSpawn: options.flags["no-spawn"] === true
+    noSpawn: options.flags["no-spawn"] === true,
+    advise: options.flags.advise === true,
+    reviewIssueId: optional(merged, "CODEX_LINEAR_REVIEW_ISSUE_ID"),
+    reviewArtifactUrl: optional(merged, "CODEX_LINEAR_REVIEW_ARTIFACT_URL")
   }
+}
+
+function defaultStateDir(profile: ConfigProfile): string {
+  const name = profile === "review"
+    ? "codex-linear-review-delegator"
+    : "codex-linear-work-delegator"
+  return `${process.env.HOME ?? "."}/.local/state/${name}`
 }
 
 function applyFlags(env: EnvMap, flags: CliOptions["flags"]): void {

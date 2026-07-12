@@ -30,10 +30,29 @@ export class LinearClient {
     return candidates.sort(compareIssues)
   }
 
+  async getReviewCandidateIssues(): Promise<LinearIssue[]> {
+    const issues = await this.getVisibleIssues()
+
+    const candidates = issues.filter((issue) => {
+      if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
+      if (issue.state.name !== this.config.reviewReadyStatus) return false
+      return this.config.reviewerLabels.some((reviewerLabel) => issue.labels.nodes.some((label) => matchesLabel(label, reviewerLabel)))
+    })
+
+    return candidates.sort(compareIssues)
+  }
+
   async getRunningIssues(): Promise<LinearIssue[]> {
     return (await this.getVisibleIssues()).filter((issue) => {
       if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
       return issue.state.name === this.config.runningStatus
+    })
+  }
+
+  async getReviewRunningIssues(): Promise<LinearIssue[]> {
+    return (await this.getVisibleIssues()).filter((issue) => {
+      if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
+      return issue.state.name === this.config.reviewRunningStatus
     })
   }
 
@@ -82,6 +101,17 @@ export class LinearClient {
     const claimed = await this.getIssue(issue.id)
     if (claimed.state.name !== this.config.runningStatus) {
       throw new Error(`Claim verification failed for ${issue.identifier}: state is "${claimed.state.name}"`)
+    }
+    return claimed
+  }
+
+  async claimReviewIssue(issue: LinearIssue): Promise<LinearIssue> {
+    const runningStateId = await this.getWorkflowStateId(issue.team.key, this.config.reviewRunningStatus)
+    await this.updateIssueState(issue.id, runningStateId)
+    await this.createComment(issue.id, `Review claimed by ${this.config.agentId} at ${new Date().toISOString()}.`)
+    const claimed = await this.getIssue(issue.id)
+    if (claimed.state.name !== this.config.reviewRunningStatus) {
+      throw new Error(`Review claim verification failed for ${issue.identifier}: state is "${claimed.state.name}"`)
     }
     return claimed
   }

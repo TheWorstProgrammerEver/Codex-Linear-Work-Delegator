@@ -227,10 +227,15 @@ const baseConfig = (overrides = {}) => ({
   linearApiUrl: "https://linear.example/graphql",
   agentId: "daedalus",
   agentLabels: ["agent:daedalus", "agent:any"],
+  reviewerLabels: ["reviewer:daedalus", "reviewer:any"],
   readyStatus: "Waiting For Agent",
   runningStatus: "Agent In Progress",
   blockedStatus: "Blocked",
   reviewStatus: "In Review",
+  reviewReadyStatus: "In Review",
+  reviewRunningStatus: "In Testing",
+  reviewPassedStatus: "Review Passed",
+  reviewReturnStatus: "Waiting For Agent",
   defaultModel: "gpt-5.5",
   defaultSandbox: "danger-full-access",
   codexBin: "codex",
@@ -243,6 +248,7 @@ const baseConfig = (overrides = {}) => ({
   fetchLimit: 50,
   dryRun: false,
   noSpawn: false,
+  advise: false,
   ...overrides
 })
 
