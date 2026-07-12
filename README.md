@@ -45,8 +45,8 @@ Recommended statuses:
 - `Agent In Progress`: claimed/running.
 - `Blocked`: agent could not continue.
 - `In Review`: agent believes work is complete and needs human review.
-- `In Testing`: optional review-running status for the review runner.
-- `Review Passed`: successful review status for the review runner. Create this status in Linear or override `CODEX_LINEAR_REVIEW_PASSED_STATUS`.
+- `In Testing`: review-running status for the review runner.
+- `In Progress`: temporary successful review status for the review runner. Override `CODEX_LINEAR_REVIEW_PASSED_STATUS` when a dedicated review-passed status exists.
 
 Recommended labels:
 
@@ -297,7 +297,7 @@ When a review is selected in apply mode, the runner:
 
 The startup health check treats labels configured in `CODEX_LINEAR_REVIEWER_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `reviewer:any`, it checks the latest review-claim comment and only warns if that comment says this agent claimed the review. It does not mark reviews failed, kill processes, or infer failure from age alone.
 
-The reviewer prompt tells Codex to classify the artifact, run narrow validation, leave GitHub inline comments plus an overall summary when reviewing PRs, and keep Linear comments concise. Required changes should move the issue to `CODEX_LINEAR_REVIEW_RETURN_STATUS`, default `Waiting For Agent`. Successful reviews should move the issue to `CODEX_LINEAR_REVIEW_PASSED_STATUS`, default `Review Passed`. If that status does not exist, the reviewer must treat it as a review-process setup blocker rather than silently substituting another status.
+The reviewer prompt tells Codex to classify the artifact, run narrow validation, leave GitHub inline comments plus an overall summary when reviewing PRs, and keep Linear comments concise. Required changes should move the issue to `CODEX_LINEAR_REVIEW_RETURN_STATUS`, default `Waiting For Agent`. Successful reviews should move the issue to `CODEX_LINEAR_REVIEW_PASSED_STATUS`, default `In Progress`. If that status does not exist, the reviewer must treat it as a review-process setup blocker rather than silently substituting another status.
 
 Use advise mode for calibration or self-review tests:
 

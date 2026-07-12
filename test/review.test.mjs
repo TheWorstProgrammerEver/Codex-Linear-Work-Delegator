@@ -270,7 +270,7 @@ test("review prompt includes advise guardrails and state routing", () => {
   assert.match(prompt, /Do not create or update Linear comments, GitHub comments/)
   assert.match(prompt, /Additional artifact URL: https:\/\/github\.com\/example\/repo\/pull\/123/)
   assert.match(prompt, /Required changes:.*move the issue to "Waiting For Agent"/s)
-  assert.match(prompt, /Passed:.*move the issue to "Review Passed"/s)
+  assert.match(prompt, /Passed:.*move the issue to "In Progress"/s)
   assert.match(prompt, /Reviewer Independence:/)
 })
 
@@ -286,7 +286,7 @@ const baseConfig = (overrides = {}) => ({
   reviewStatus: "In Review",
   reviewReadyStatus: "In Review",
   reviewRunningStatus: "In Testing",
-  reviewPassedStatus: "Review Passed",
+  reviewPassedStatus: "In Progress",
   reviewReturnStatus: "Waiting For Agent",
   defaultModel: "gpt-5.5",
   defaultSandbox: "danger-full-access",

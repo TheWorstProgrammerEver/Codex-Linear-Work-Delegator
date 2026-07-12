@@ -69,7 +69,7 @@ const baseConfig = (overrides = {}) => ({
   reviewStatus: "In Review",
   reviewReadyStatus: "In Review",
   reviewRunningStatus: "In Testing",
-  reviewPassedStatus: "Review Passed",
+  reviewPassedStatus: "In Progress",
   reviewReturnStatus: "Waiting For Agent",
   defaultModel: "gpt-5.5",
   defaultSandbox: "danger-full-access",

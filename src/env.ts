@@ -64,7 +64,7 @@ export function loadConfig(options: CliOptions, cwd: string, profile: ConfigProf
     reviewStatus,
     reviewReadyStatus: value(merged, "CODEX_LINEAR_REVIEW_READY_STATUS", reviewStatus),
     reviewRunningStatus: value(merged, "CODEX_LINEAR_REVIEW_RUNNING_STATUS", "In Testing"),
-    reviewPassedStatus: value(merged, "CODEX_LINEAR_REVIEW_PASSED_STATUS", "Review Passed"),
+    reviewPassedStatus: value(merged, "CODEX_LINEAR_REVIEW_PASSED_STATUS", "In Progress"),
     reviewReturnStatus: value(merged, "CODEX_LINEAR_REVIEW_RETURN_STATUS", readyStatus),
     defaultModel: value(merged, "CODEX_LINEAR_DEFAULT_MODEL", "gpt-5.5"),
     defaultSandbox: value(merged, "CODEX_LINEAR_DEFAULT_SANDBOX", "danger-full-access"),
