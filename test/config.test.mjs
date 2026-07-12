@@ -85,6 +85,25 @@ test("review config defaults to separate state, reviewer labels, and review stat
   })
 })
 
+test("committed defaults keep work and review state directories separate", () => {
+  const home = mkdtempSync(join(tmpdir(), "codex-linear-config-home-"))
+  const restoreEnv = cleanEnv(["HOME", "LINEAR_API_KEY", "CODEX_LINEAR_STATE_DIR"])
+
+  process.env.HOME = home
+  process.env.LINEAR_API_KEY = "test-key"
+
+  try {
+    const work = loadConfig({ envFiles: [], flags: {} }, process.cwd(), "work")
+    const review = loadConfig({ envFiles: [], flags: {} }, process.cwd(), "review")
+
+    assert.equal(work.stateDir, join(home, ".local", "state", "codex-linear-work-delegator"))
+    assert.equal(review.stateDir, join(home, ".local", "state", "codex-linear-review-delegator"))
+  } finally {
+    restoreEnv()
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
 test("config expands home placeholders for local paths", () => {
   withTempConfig([
     "LINEAR_API_KEY=test-key",

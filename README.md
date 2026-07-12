@@ -278,6 +278,8 @@ For PR-producing work, the spawned prompt directs workers to `$HOME/codex-notes/
 
 `codex-linear-review-delegator` is a separate command/process for review automation. It reuses the Linear API client, issue snapshot, label parsing, Codex launch options, locking, and systemd installer, but defaults to a separate state directory: `~/.local/state/codex-linear-review-delegator`.
 
+The committed `.env.defaults` intentionally does not set `CODEX_LINEAR_STATE_DIR`; leaving it unset lets the work and review commands choose separate profile defaults. Set `CODEX_LINEAR_STATE_DIR` only in a command-specific env file or installer invocation.
+
 Use a separate review env file, or make sure `CODEX_LINEAR_STATE_DIR` points at review state. Reusing the work-runner env file unchanged can point the reviewer at `~/.local/state/codex-linear-work-delegator`, causing it to treat active implementation work as an active review.
 
 An issue is eligible for review when:
