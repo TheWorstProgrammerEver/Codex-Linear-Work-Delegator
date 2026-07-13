@@ -45,8 +45,8 @@ Recommended statuses:
 - `Agent In Progress`: claimed/running.
 - `Blocked`: agent could not continue.
 - `In Review`: agent believes work is complete and needs human review.
-- `In Testing`: review-running status for the review runner.
-- `In Progress`: temporary successful review status for the review runner. Override `CODEX_LINEAR_REVIEW_PASSED_STATUS` when a dedicated review-passed status exists.
+- `Agent Reviewing`: review-running status for the review runner.
+- `Review Passed`: successful review status for the review runner.
 
 Recommended labels:
 
@@ -292,14 +292,31 @@ An issue is eligible for review when:
 When a review is selected in apply mode, the runner:
 
 1. checks for likely abandoned `CODEX_LINEAR_REVIEW_RUNNING_STATUS` issues for this reviewer and comments for manual recovery without changing their status;
-2. moves one eligible issue to `CODEX_LINEAR_REVIEW_RUNNING_STATUS`, default `In Testing`;
+2. moves one eligible issue to `CODEX_LINEAR_REVIEW_RUNNING_STATUS`, default `Agent Reviewing`;
 3. adds a concise review-claim comment;
 4. fetches a compact issue snapshot;
 5. spawns `codex exec` with the reviewer prompt.
 
 The startup health check treats labels configured in `CODEX_LINEAR_REVIEWER_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `reviewer:any`, it checks the latest review-claim comment and only warns if that comment says this agent claimed the review. It does not mark reviews failed, kill processes, or infer failure from age alone.
 
-The reviewer prompt tells Codex to classify the artifact, run narrow validation, leave GitHub inline comments plus an overall summary when reviewing PRs, and keep Linear comments concise. Required changes should move the issue to `CODEX_LINEAR_REVIEW_RETURN_STATUS`, default `Waiting For Agent`. Successful reviews should move the issue to `CODEX_LINEAR_REVIEW_PASSED_STATUS`, default `In Progress`. If that status does not exist, the reviewer must treat it as a review-process setup blocker rather than silently substituting another status.
+The reviewer prompt tells Codex to classify the artifact, run narrow validation, leave GitHub inline comments plus an overall summary when reviewing PRs, and keep Linear comments concise. Required changes should move the issue to `CODEX_LINEAR_REVIEW_RETURN_STATUS`, default `Waiting For Agent`. Successful reviews should move the issue to `CODEX_LINEAR_REVIEW_PASSED_STATUS`, default `Review Passed`. If that status does not exist, the reviewer must treat it as a review-process setup blocker rather than silently substituting another status.
+
+### Momus Review Profile
+
+Run Momus reviews with a separate env file and state directory from the implementation worker. A Daedalus-host Momus review profile should live at `/home/daedalus/.config/codex-linear-review-delegator/env` and include:
+
+```dotenv
+LINEAR_API_KEY=<review-linear-api-key>
+CODEX_LINEAR_TEAM_KEY=RYA
+CODEX_LINEAR_AGENT_ID=momus
+CODEX_LINEAR_REVIEWER_LABELS=reviewer:momus,reviewer:any
+CODEX_LINEAR_REVIEW_RUNNING_STATUS=Agent Reviewing
+CODEX_LINEAR_REVIEW_PASSED_STATUS=Review Passed
+CODEX_LINEAR_STATE_DIR=/home/daedalus/.local/state/codex-linear-review-delegator
+CODEX_GITHUB_ENV=/home/daedalus/.config/codex-github/momus.env
+```
+
+`CODEX_GITHUB_ENV` is not consumed by this runner directly. The systemd unit loads it through `EnvironmentFile`, and spawned review runs inherit the service environment so GitHub helper commands inside the review use the Momus GitHub App profile.
 
 Use advise mode for calibration or self-review tests:
 

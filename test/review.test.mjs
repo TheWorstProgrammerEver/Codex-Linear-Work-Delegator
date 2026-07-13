@@ -13,7 +13,7 @@ test("startup health check comments on abandoned in-progress reviews", async () 
   const comments = []
   const issue = linearIssue({
     labels: [reviewerLabel("daedalus")],
-    state: workflowState("testing", "In Testing", "started"),
+    state: workflowState("reviewing", "Agent Reviewing", "started"),
     comments: []
   })
 
@@ -27,7 +27,7 @@ test("startup health check comments on abandoned in-progress reviews", async () 
     assert.equal(count, 1)
     assert.equal(comments[0].issueId, "issue-1")
     assert.match(comments[0].body, /Review startup health check:/)
-    assert.match(comments[0].body, /still in In Testing/)
+    assert.match(comments[0].body, /still in Agent Reviewing/)
     assert.match(comments[0].body, /move the issue back to In Review/)
     assert.match(comments[0].body, /I am not changing status, killing processes, or assuming failure/)
   } finally {
@@ -156,7 +156,7 @@ test("review claim skips blocked candidates and claims the next eligible review"
       return jsonResponse({
         data: {
           workflowStates: {
-            nodes: [workflowState("testing", "In Testing", "started", claimable.team)]
+            nodes: [workflowState("reviewing", "Agent Reviewing", "started", claimable.team)]
           }
         }
       })
@@ -170,7 +170,7 @@ test("review claim skips blocked candidates and claims the next eligible review"
             issue: {
               id: "claimable",
               identifier: "RYA-4",
-              state: workflowState("testing", "In Testing", "started")
+              state: workflowState("reviewing", "Agent Reviewing", "started")
             }
           }
         }
@@ -185,7 +185,7 @@ test("review claim skips blocked candidates and claims the next eligible review"
         data: {
           issue: {
             ...claimable,
-            state: workflowState("testing", "In Testing", "started")
+            state: workflowState("reviewing", "Agent Reviewing", "started")
           }
         }
       })
@@ -270,7 +270,7 @@ test("review prompt includes advise guardrails and state routing", () => {
   assert.match(prompt, /Do not create or update Linear comments, GitHub comments/)
   assert.match(prompt, /Additional artifact URL: https:\/\/github\.com\/example\/repo\/pull\/123/)
   assert.match(prompt, /Required changes:.*move the issue to "Waiting For Agent"/s)
-  assert.match(prompt, /Passed:.*move the issue to "In Progress"/s)
+  assert.match(prompt, /Passed:.*move the issue to "Review Passed"/s)
   assert.match(prompt, /Reviewer Independence:/)
 })
 
@@ -285,8 +285,8 @@ const baseConfig = (overrides = {}) => ({
   blockedStatus: "Blocked",
   reviewStatus: "In Review",
   reviewReadyStatus: "In Review",
-  reviewRunningStatus: "In Testing",
-  reviewPassedStatus: "In Progress",
+  reviewRunningStatus: "Agent Reviewing",
+  reviewPassedStatus: "Review Passed",
   reviewReturnStatus: "Waiting For Agent",
   defaultModel: "gpt-5.5",
   defaultSandbox: "danger-full-access",

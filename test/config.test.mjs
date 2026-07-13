@@ -76,8 +76,8 @@ test("review config defaults to separate state, reviewer labels, and review stat
       assert.equal(config.stateDir, join(cwd, "my-user", ".local", "state", "codex-linear-review-delegator"))
       assert.deepEqual(config.reviewerLabels, ["reviewer:daedalus", "reviewer:any"])
       assert.equal(config.reviewReadyStatus, "In Review")
-      assert.equal(config.reviewRunningStatus, "In Testing")
-      assert.equal(config.reviewPassedStatus, "In Progress")
+      assert.equal(config.reviewRunningStatus, "Agent Reviewing")
+      assert.equal(config.reviewPassedStatus, "Review Passed")
       assert.equal(config.reviewReturnStatus, "Waiting For Agent")
     } finally {
       restoreEnv()

@@ -14,8 +14,8 @@ Options:
   --agent-id <id>                    Reviewer id used in comments.
   --reviewer-labels <csv>            Eligible reviewer labels.
   --review-ready-status <name>       Eligible review status. Default: In Review.
-  --review-running-status <name>     Claimed review status. Default: In Testing.
-  --review-passed-status <name>      Successful review status. Default: In Progress.
+  --review-running-status <name>     Claimed review status. Default: Agent Reviewing.
+  --review-passed-status <name>      Successful review status. Default: Review Passed.
   --review-return-status <name>      Required-changes status. Default: Waiting For Agent.
   --blocked-status <name>            Blocked Linear status.
   --default-model <model>            Codex model when no agent:model label is present.
