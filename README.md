@@ -45,6 +45,8 @@ Recommended statuses:
 - `Agent In Progress`: claimed/running.
 - `Blocked`: agent could not continue.
 - `In Review`: agent believes work is complete and needs human review.
+- `Agent Reviewing`: review-running status for the review runner.
+- `Review Passed`: successful review status for the review runner.
 
 Recommended labels:
 
@@ -56,6 +58,8 @@ Recommended labels:
 - `agent:speed:fast`: request Codex Fast mode for this issue.
 - `agent:speed:standard`: force Fast mode off for this issue.
 - Optional later: `agent:sandbox:workspace-write` or `agent:sandbox:danger-full-access`.
+- `reviewer:my-agent`: the agent named `my-agent` may review it.
+- `reviewer:any`: any compatible local reviewer may review it.
 
 An issue is eligible when:
 
@@ -269,6 +273,71 @@ Codex is instructed to update Linear when complete or blocked:
 - move to `Blocked` with blocker notes when blocked.
 
 For PR-producing work, the spawned prompt directs workers to `$HOME/codex-notes/runbooks/github-app-pr-workflow.md` when present and names the preferred GitHub App helper path: `codex-github-token --expires-at`, `codex-gh` for GitHub API/PR state, and `GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=$HOME/.local/bin/codex-github-askpass git push ...` for authenticated HTTPS Git operations. If a push returns `403`, workers should verify token minting, installation repository access, askpass configuration, and a dry-run push before concluding that repository access is absent.
+
+## Review Runner
+
+`codex-linear-review-delegator` is a separate command/process for review automation. It reuses the Linear API client, issue snapshot, label parsing, Codex launch options, locking, and systemd installer, but defaults to a separate state directory: `~/.local/state/codex-linear-review-delegator`.
+
+The committed `.env.defaults` intentionally does not set `CODEX_LINEAR_STATE_DIR`; leaving it unset lets the work and review commands choose separate profile defaults. Set `CODEX_LINEAR_STATE_DIR` only in a command-specific env file or installer invocation.
+
+Use a separate review env file, or make sure `CODEX_LINEAR_STATE_DIR` points at review state. Reusing the work-runner env file unchanged can point the reviewer at `~/.local/state/codex-linear-work-delegator`, causing it to treat active implementation work as an active review.
+
+An issue is eligible for review when:
+
+- its status matches `CODEX_LINEAR_REVIEW_READY_STATUS`, default `In Review`;
+- it has one of `CODEX_LINEAR_REVIEWER_LABELS`, default `reviewer:<agent-id>,reviewer:any`;
+- it is not blocked by unresolved Linear dependency relations;
+- no review is already active in the review runner state directory.
+
+When a review is selected in apply mode, the runner:
+
+1. checks for likely abandoned `CODEX_LINEAR_REVIEW_RUNNING_STATUS` issues for this reviewer and comments for manual recovery without changing their status;
+2. moves one eligible issue to `CODEX_LINEAR_REVIEW_RUNNING_STATUS`, default `Agent Reviewing`;
+3. adds a concise review-claim comment;
+4. fetches a compact issue snapshot;
+5. spawns `codex exec` with the reviewer prompt.
+
+The startup health check treats labels configured in `CODEX_LINEAR_REVIEWER_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `reviewer:any`, it checks the latest review-claim comment and only warns if that comment says this agent claimed the review. It does not mark reviews failed, kill processes, or infer failure from age alone.
+
+The reviewer prompt tells Codex to classify the artifact, run narrow validation, leave GitHub inline comments plus an overall summary when reviewing PRs, and keep Linear comments concise. Required changes should move the issue to `CODEX_LINEAR_REVIEW_RETURN_STATUS`, default `Waiting For Agent`. Successful reviews should move the issue to `CODEX_LINEAR_REVIEW_PASSED_STATUS`, default `Review Passed`. If that status does not exist, the reviewer must treat it as a review-process setup blocker rather than silently substituting another status.
+
+For GitHub PRs in apply mode, a successful review includes merge ownership. The reviewer should submit the successful GitHub review, verify ready state, checks, required approvals, unresolved review threads, mergeability, and the allowed merge method, then merge the PR before leaving the Linear success comment. If the only obstacle is draft state and the issue/completion evidence says the work is ready for automated review, the reviewer may mark it ready before merge. The Linear success comment must include the external review URL, the merged PR URL, and an explicit statement that the PR was merged. If the PR otherwise passes but cannot be merged, the reviewer should not route to `Review Passed`; they should move the issue to `Waiting For Agent` for work-caused merge blockers or `Blocked` for external/access/human-gate blockers, with a concise Linear comment naming the blocker.
+
+### Momus Review Profile
+
+Run Momus reviews with a separate env file and state directory from the implementation worker. A Daedalus-host Momus review profile should live at `/home/daedalus/.config/codex-linear-review-delegator/env` and include:
+
+```dotenv
+LINEAR_API_KEY=<review-linear-api-key>
+CODEX_LINEAR_TEAM_KEY=RYA
+CODEX_LINEAR_AGENT_ID=momus
+CODEX_LINEAR_REVIEWER_LABELS=reviewer:momus,reviewer:any
+CODEX_LINEAR_REVIEW_RUNNING_STATUS=Agent Reviewing
+CODEX_LINEAR_REVIEW_PASSED_STATUS=Review Passed
+CODEX_LINEAR_STATE_DIR=/home/daedalus/.local/state/codex-linear-review-delegator
+CODEX_GITHUB_ENV=/home/daedalus/.config/codex-github/momus.env
+```
+
+`CODEX_GITHUB_ENV` is not consumed by this runner directly. The systemd unit loads it through `EnvironmentFile`, and spawned review runs inherit the service environment so GitHub helper commands inside the review use the Momus GitHub App profile.
+
+Use advise mode for calibration or self-review tests:
+
+```bash
+npm run start:review -- --advise --issue-id RYA-105 --artifact-url https://github.com/example/repo/pull/123
+```
+
+Advise mode does not claim the issue, write comments, update statuses, commit files, or otherwise mutate Linear/GitHub. It writes the review result to the Codex run output/log only.
+
+Install a separate review timer with the same installer:
+
+```bash
+sudo UNIT_BASE=codex-linear-review-delegator \
+  UNIT_DESCRIPTION="Codex Linear Review Delegator" \
+  TIMER_DESCRIPTION="Poll Linear for local Codex reviews" \
+  NPM_SCRIPT=start:review \
+  ENV_FILE=~/.config/codex-linear-review-delegator/env \
+  ./scripts/install-schedule.sh
+```
 
 ## Notes
 

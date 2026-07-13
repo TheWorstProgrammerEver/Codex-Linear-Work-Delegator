@@ -1,0 +1,29 @@
+Usage: codex-linear-review-delegator [options]
+
+Poll Linear, select one eligible issue for review, then spawn Codex as a reviewer for that issue.
+
+Options:
+  --env-file <path>                  Load an additional env file.
+  --dry-run                          Find the next review but do not claim or spawn.
+  --no-spawn                         Select or claim the review but do not spawn Codex.
+  --advise                           Run review in no-side-effect advise mode.
+  --issue-id <id>                    Review one explicit Linear issue id/identifier.
+  --artifact-url <url>               Additional artifact URL for the reviewer prompt.
+  --wait-timeout-seconds <sec>       Detached mode only: wait this long before returning. Default: 60.
+  --team-key <key>                   Restrict polling to a Linear team key.
+  --agent-id <id>                    Reviewer id used in comments.
+  --reviewer-labels <csv>            Eligible reviewer labels.
+  --review-ready-status <name>       Eligible review status. Default: In Review.
+  --review-running-status <name>     Claimed review status. Default: Agent Reviewing.
+  --review-passed-status <name>      Successful review status. Default: Review Passed.
+  --review-return-status <name>      Required-changes status. Default: Waiting For Agent.
+  --blocked-status <name>            Blocked Linear status.
+  --default-model <model>            Codex model when no agent:model label is present.
+  --default-sandbox <mode>           Codex sandbox when no agent:sandbox label is present.
+  --codex-bin <path>                 Codex executable.
+  --codex-cwd <path>                 Working directory for codex exec.
+  --codex-exec-mode <mode>           Codex execution mode: attached or detached. Default: attached.
+  --codex-extra-args <args>          Extra static args appended before the prompt.
+  --state-dir <path>                 Local reviewer state directory.
+  --fetch-limit <count>              Linear issue fetch limit.
+  --help                             Show this help.

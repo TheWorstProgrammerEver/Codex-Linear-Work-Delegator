@@ -8,10 +8,15 @@ export interface Config {
   teamKey?: string
   agentId: string
   agentLabels: string[]
+  reviewerLabels: string[]
   readyStatus: string
   runningStatus: string
   blockedStatus: string
   reviewStatus: string
+  reviewReadyStatus: string
+  reviewRunningStatus: string
+  reviewPassedStatus: string
+  reviewReturnStatus: string
   defaultModel: string
   defaultSandbox: string
   codexBin: string
@@ -24,6 +29,9 @@ export interface Config {
   fetchLimit: number
   dryRun: boolean
   noSpawn: boolean
+  advise: boolean
+  reviewIssueId?: string
+  reviewArtifactUrl?: string
 }
 
 export type CodexExecMode = "attached" | "detached"

@@ -4,16 +4,29 @@ import { join } from "node:path"
 import { writeCurrentState } from "../state.js"
 import { buildCodexArgs, getCodexLaunchOptions } from "./options.js"
 import { buildPrompt } from "./prompt.js"
+import { buildReviewPrompt } from "../review/prompt.js"
 import { waitForChildOrTimeout, waitForChildStart } from "./wait.js"
 import type { Config } from "../env/types.js"
 import type { LinearIssue } from "../linear/types.js"
 import type { CurrentState } from "../state.js"
 
 export async function spawnCodexForIssue(config: Config, issue: LinearIssue): Promise<void> {
+  await spawnCodex(config, issue, buildPrompt(config, issue), "work")
+}
+
+export async function spawnCodexForReview(config: Config, issue: LinearIssue): Promise<void> {
+  await spawnCodex(config, issue, buildReviewPrompt(config, issue), "review")
+}
+
+async function spawnCodex(
+  config: Config,
+  issue: LinearIssue,
+  prompt: string,
+  purpose: "work" | "review"
+): Promise<void> {
   const launchOptions = getCodexLaunchOptions(config, issue)
   const logFile = openIssueLog(config.stateDir, issue.identifier)
   const logFd = openSync(logFile, "a")
-  const prompt = buildPrompt(config, issue)
   const args = buildCodexArgs(config, launchOptions, prompt)
 
   const child = spawn(config.codexBin, args, {
@@ -26,7 +39,7 @@ export async function spawnCodexForIssue(config: Config, issue: LinearIssue): Pr
   const pid = await waitForChildStart(child)
   const currentState = buildCurrentState(issue, pid, launchOptions.model, logFile)
   writeCurrentState(config, currentState)
-  logSpawn(config, currentState, launchOptions.sandbox, launchOptions.reasoningEffort, launchOptions.speed)
+  logSpawn(config, currentState, launchOptions.sandbox, launchOptions.reasoningEffort, launchOptions.speed, purpose)
 
   await waitForChildOrTimeout(config, currentState.pid, child)
 }
@@ -46,9 +59,16 @@ const buildCurrentState = (issue: LinearIssue, pid: number, model: string, logFi
   logFile
 })
 
-function logSpawn(config: Config, state: CurrentState, sandbox: string, reasoningEffort?: string, speed?: string): void {
+function logSpawn(
+  config: Config,
+  state: CurrentState,
+  sandbox: string,
+  reasoningEffort?: string,
+  speed?: string,
+  purpose: "work" | "review" = "work"
+): void {
   const reasoning = reasoningEffort ? ` reasoning=${reasoningEffort}` : ""
   const speedOption = speed ? ` speed=${speed}` : ""
-  console.log(`Spawned Codex pid=${state.pid} mode=${config.codexExecMode} model=${state.model} sandbox=${sandbox}${reasoning}${speedOption} issue=${state.identifier}`)
+  console.log(`Spawned Codex ${purpose} pid=${state.pid} mode=${config.codexExecMode} model=${state.model} sandbox=${sandbox}${reasoning}${speedOption} issue=${state.identifier}`)
   console.log(`Log: ${state.logFile}`)
 }

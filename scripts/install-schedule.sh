@@ -4,10 +4,13 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="${REPO_DIR:-$(cd -- "$script_dir/.." && pwd)}"
 unit_base="${UNIT_BASE:-codex-linear-work-delegator}"
+unit_description="${UNIT_DESCRIPTION:-Codex Linear Work Delegator}"
+timer_description="${TIMER_DESCRIPTION:-Poll Linear for local Codex work}"
 systemd_dir="${SYSTEMD_DIR:-/etc/systemd/system}"
 systemctl_bin="${SYSTEMCTL_BIN:-systemctl}"
 install_bin="${INSTALL_BIN:-install}"
 target_user="${TARGET_USER:-${SUDO_USER:-$(id -un)}}"
+npm_script="${NPM_SCRIPT:-start}"
 on_boot_sec="${ON_BOOT_SEC:-2min}"
 poll_interval="${POLL_INTERVAL:-5min}"
 accuracy_sec="${ACCURACY_SEC:-30s}"
@@ -23,6 +26,11 @@ service_unit="${unit_base}.service"
 timer_unit="${unit_base}.timer"
 service_path="${systemd_dir}/${service_unit}"
 timer_path="${systemd_dir}/${timer_unit}"
+exec_start="$npm_bin start -- --env-file $env_file"
+
+if [[ "$npm_script" != "start" ]]; then
+  exec_start="$npm_bin run $npm_script -- --env-file $env_file"
+fi
 
 if [[ -z "$npm_bin" ]]; then
   printf 'Unable to find npm on PATH. Set NPM_BIN explicitly.\n' >&2
@@ -55,7 +63,7 @@ trap cleanup EXIT
 
 cat >"$tmp_service" <<EOF
 [Unit]
-Description=Codex Linear Work Delegator
+Description=$unit_description
 After=network-online.target
 Wants=network-online.target
 
@@ -64,7 +72,7 @@ Type=oneshot
 User=$target_user
 WorkingDirectory=$repo_dir
 EnvironmentFile=$env_file
-ExecStart=$npm_bin start -- --env-file $env_file
+ExecStart=$exec_start
 TimeoutStartSec=infinity
 KillMode=control-group
 
@@ -74,7 +82,7 @@ EOF
 
 cat >"$tmp_timer" <<EOF
 [Unit]
-Description=Poll Linear for local Codex work
+Description=$timer_description
 
 [Timer]
 OnBootSec=$on_boot_sec

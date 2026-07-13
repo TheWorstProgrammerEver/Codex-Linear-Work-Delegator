@@ -1,6 +1,6 @@
 import type { CliOptions } from "./types.js"
 
-const BOOLEAN_FLAGS = new Set(["dry-run", "no-spawn", "help"])
+const BOOLEAN_FLAGS = new Set(["advise", "dry-run", "no-spawn", "help"])
 
 export const parseArgs = (argv: string[]): CliOptions =>
   parseArgTokens(argv, { envFiles: [], flags: {} })

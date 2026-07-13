@@ -4,14 +4,16 @@
   "description": "Local Linear issue delegator that claims work and spawns Codex only when needed.",
   "type": "module",
   "bin": {
-    "codex-linear-work-delegator": "./dist/cli.js"
+    "codex-linear-work-delegator": "./dist/cli.js",
+    "codex-linear-review-delegator": "./dist/review-cli.js"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.json && npm run copy-assets && chmod +x dist/cli.js",
+    "build": "rm -rf dist && tsc -p tsconfig.json && npm run copy-assets && chmod +x dist/cli.js dist/review-cli.js",
     "check": "tsc -p tsconfig.json --noEmit",
-    "copy-assets": "cp src/cli/help.txt dist/cli/help.txt && cp src/claim-work/abandoned-running-work-comment.md dist/claim-work/abandoned-running-work-comment.md && cp src/codex/prompt.md dist/codex/prompt.md && cp src/linear/queries/*.graphql dist/linear/queries/",
+    "copy-assets": "cp src/cli/help.txt dist/cli/help.txt && cp src/cli/review-help.txt dist/cli/review-help.txt && cp src/claim-work/abandoned-running-work-comment.md dist/claim-work/abandoned-running-work-comment.md && cp src/codex/prompt.md dist/codex/prompt.md && cp src/review/abandoned-review-comment.md dist/review/abandoned-review-comment.md && cp src/review/prompt.md dist/review/prompt.md && cp src/linear/queries/*.graphql dist/linear/queries/",
     "test": "npm run build && node --test test/*.test.mjs",
     "start": "node dist/cli.js",
+    "start:review": "node dist/review-cli.js",
     "dev": "tsx src/cli.ts"
   },
   "keywords": [
