@@ -301,6 +301,8 @@ The startup health check treats labels configured in `CODEX_LINEAR_REVIEWER_LABE
 
 The reviewer prompt tells Codex to classify the artifact, run narrow validation, leave GitHub inline comments plus an overall summary when reviewing PRs, and keep Linear comments concise. Required changes should move the issue to `CODEX_LINEAR_REVIEW_RETURN_STATUS`, default `Waiting For Agent`. Successful reviews should move the issue to `CODEX_LINEAR_REVIEW_PASSED_STATUS`, default `Review Passed`. If that status does not exist, the reviewer must treat it as a review-process setup blocker rather than silently substituting another status.
 
+For GitHub PRs in apply mode, a successful review includes merge ownership. The reviewer should submit the successful GitHub review, verify ready state, checks, required approvals, unresolved review threads, mergeability, and the allowed merge method, then merge the PR before leaving the Linear success comment. If the only obstacle is draft state and the issue/completion evidence says the work is ready for automated review, the reviewer may mark it ready before merge. The Linear success comment must include the external review URL, the merged PR URL, and an explicit statement that the PR was merged. If the PR otherwise passes but cannot be merged, the reviewer should not route to `Review Passed`; they should move the issue to `Waiting For Agent` for work-caused merge blockers or `Blocked` for external/access/human-gate blockers, with a concise Linear comment naming the blocker.
+
 ### Momus Review Profile
 
 Run Momus reviews with a separate env file and state directory from the implementation worker. A Daedalus-host Momus review profile should live at `/home/daedalus/.config/codex-linear-review-delegator/env` and include:

@@ -29,7 +29,7 @@ function buildModeInstructions(config: Config): string {
 
   return [
     "Review mode: advise only.",
-    "Do not create or update Linear comments, GitHub comments, GitHub reviews, issue statuses, branches, commits, or files.",
+    "Do not create or update Linear comments, GitHub comments, GitHub reviews, issue statuses, branches, commits, files, or merge PRs.",
     "Inspect the issue and artifact, run narrow read-only validation where practical, and write the review result to this Codex run output only."
   ].join("\n")
 }

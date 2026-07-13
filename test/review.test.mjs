@@ -267,10 +267,13 @@ test("review prompt includes advise guardrails and state routing", () => {
   }))
 
   assert.match(prompt, /Review mode: advise only/)
-  assert.match(prompt, /Do not create or update Linear comments, GitHub comments/)
+  assert.match(prompt, /Do not create or update Linear comments, GitHub comments.*or merge PRs/)
   assert.match(prompt, /Additional artifact URL: https:\/\/github\.com\/example\/repo\/pull\/123/)
   assert.match(prompt, /Required changes:.*move the issue to "Waiting For Agent"/s)
-  assert.match(prompt, /Passed:.*move the issue to "Review Passed"/s)
+  assert.match(prompt, /passing GitHub PRs in apply mode.*merge the PR before leaving the Linear success comment/s)
+  assert.match(prompt, /Successful GitHub PR comments must state that the PR was merged/)
+  assert.match(prompt, /Passed:.*merged PR URL.*move the issue to "Review Passed"/s)
+  assert.match(prompt, /GitHub PR otherwise passes but cannot be merged.*do not use the Passed verdict/s)
   assert.match(prompt, /Reviewer Independence:/)
 })
 
