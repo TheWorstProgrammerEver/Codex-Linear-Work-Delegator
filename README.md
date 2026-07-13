@@ -289,6 +289,18 @@ An issue is eligible for review when:
 - it is not blocked by unresolved Linear dependency relations;
 - no review is already active in the review runner state directory.
 
+Organic review discovery uses a server-side Linear GraphQL filter before
+pagination: review-ready status and configured reviewer labels are always
+applied by Linear first, and `CODEX_LINEAR_TEAM_KEY` is included in the
+server-side filter when it is configured. The paginated result uses shallow
+issue fields, then the runner fetches full details only for those filtered
+candidates so unresolved blocker checks still run before any claim. The same
+filtered query shape is used for the startup `Agent Reviewing` health check.
+`CODEX_LINEAR_FETCH_LIMIT` remains the page size for these filtered review
+queries and defaults to `50`; lowering it can be a temporary operator workaround
+if Linear rejects a query, but it should not be needed for the default review
+path.
+
 When a review is selected in apply mode, the runner:
 
 1. checks for likely abandoned `CODEX_LINEAR_REVIEW_RUNNING_STATUS` issues for this reviewer and comments for manual recovery without changing their status;

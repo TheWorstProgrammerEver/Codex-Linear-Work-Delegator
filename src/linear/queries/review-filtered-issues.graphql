@@ -1,0 +1,24 @@
+query ReviewFilteredIssues($first: Int!, $teamKey: String!, $statusName: String!, $labelNames: [String!]!) {
+  issues(
+    first: $first
+    filter: {
+      team: { key: { eq: $teamKey } }
+      state: { name: { eq: $statusName } }
+      labels: { name: { in: $labelNames } }
+    }
+  ) {
+    nodes {
+      id
+      identifier
+      title
+      url
+      priority
+      priorityLabel
+      createdAt
+      updatedAt
+      state { id name type }
+      labels { nodes { id name parent { id name } } }
+      team { id key name }
+    }
+  }
+}

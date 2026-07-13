@@ -149,8 +149,18 @@ test("review claim skips blocked candidates and claims the next eligible review"
 
   globalThis.fetch = async (_url, init) => {
     const body = JSON.parse(init.body)
-    if (body.query.includes("query CandidateIssues")) {
-      return jsonResponse({ data: { issues: { nodes: [blocked, missingReviewerLabel, wrongStatus, claimable] } } })
+    if (body.query.includes("query ReviewFilteredIssues")) {
+      if (body.variables.statusName === "Agent Reviewing") {
+        return jsonResponse({ data: { issues: { nodes: [] } } })
+      }
+
+      assert.deepEqual(body.variables, {
+        first: 50,
+        teamKey: "RYA",
+        statusName: "In Review",
+        labelNames: ["reviewer:daedalus", "daedalus", "reviewer:any", "any"]
+      })
+      return jsonResponse({ data: { issues: { nodes: [blocked, claimable] } } })
     }
     if (body.query.includes("query WorkflowStates")) {
       return jsonResponse({
@@ -181,6 +191,10 @@ test("review claim skips blocked candidates and claims the next eligible review"
       return jsonResponse({ data: { commentCreate: { success: true, comment: { id: "comment-1" } } } })
     }
     if (body.query.includes("query GetIssue")) {
+      if (body.variables.id === "blocked") {
+        return jsonResponse({ data: { issue: blocked } })
+      }
+
       return jsonResponse({
         data: {
           issue: {
@@ -204,6 +218,112 @@ test("review claim skips blocked candidates and claims the next eligible review"
     assert.match(comments[0].body, /Review claimed by daedalus at /)
     assert.match(logs.join("\n"), /Skipping RYA-1; blocked by unresolved dependencies: RYA-0/)
     assert.match(logs.join("\n"), /Selected review RYA-4/)
+  } finally {
+    globalThis.fetch = originalFetch
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("organic review polling uses server-side filters before fetching full issue details", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-review-filter-"))
+  const olderEligible = linearIssue({
+    id: "older-eligible",
+    identifier: "RYA-99",
+    state: workflowState("review", "In Review", "started"),
+    labels: [reviewerLabel("daedalus")],
+    createdAt: "2026-06-01T09:00:00.000Z"
+  })
+  const calls = []
+  const originalFetch = globalThis.fetch
+  const originalLog = console.log
+  console.log = () => {}
+
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body)
+    if (body.query.includes("query ReviewFilteredIssues")) {
+      calls.push(["ReviewFilteredIssues", body.variables])
+      return jsonResponse({
+        data: {
+          issues: {
+            nodes: body.variables.statusName === "In Review" ? [olderEligible] : []
+          }
+        }
+      })
+    }
+    if (body.query.includes("query GetIssue")) {
+      calls.push(["GetIssue", body.variables])
+      return jsonResponse({ data: { issue: olderEligible } })
+    }
+    throw new Error(`Unexpected query: ${body.query}`)
+  }
+
+  try {
+    const result = await claimNextReview(baseConfig({ stateDir, dryRun: true }))
+
+    assert.equal(result, null)
+    assert.deepEqual(calls.map(([name]) => name), ["ReviewFilteredIssues", "ReviewFilteredIssues", "GetIssue"])
+    assert.deepEqual(calls[0][1], {
+      first: 50,
+      teamKey: "RYA",
+      statusName: "Agent Reviewing",
+      labelNames: ["reviewer:daedalus", "daedalus", "reviewer:any", "any"]
+    })
+    assert.deepEqual(calls[1][1], {
+      first: 50,
+      teamKey: "RYA",
+      statusName: "In Review",
+      labelNames: ["reviewer:daedalus", "daedalus", "reviewer:any", "any"]
+    })
+    assert.deepEqual(calls[2][1], { id: "older-eligible" })
+  } finally {
+    globalThis.fetch = originalFetch
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("organic review polling still filters by status and reviewer labels without a team key", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-review-all-teams-"))
+  const issue = linearIssue({
+    id: "all-teams-eligible",
+    identifier: "RYA-100",
+    state: workflowState("review", "In Review", "started"),
+    labels: [reviewerLabel("daedalus")]
+  })
+  const calls = []
+  const originalFetch = globalThis.fetch
+  const originalLog = console.log
+  console.log = () => {}
+
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body)
+    if (body.query.includes("query ReviewFilteredIssuesAllTeams")) {
+      calls.push(["ReviewFilteredIssuesAllTeams", body.variables])
+      return jsonResponse({
+        data: {
+          issues: {
+            nodes: body.variables.statusName === "In Review" ? [issue] : []
+          }
+        }
+      })
+    }
+    if (body.query.includes("query GetIssue")) {
+      calls.push(["GetIssue", body.variables])
+      return jsonResponse({ data: { issue } })
+    }
+    throw new Error(`Unexpected query: ${body.query}`)
+  }
+
+  try {
+    await claimNextReview(baseConfig({ stateDir, teamKey: undefined, dryRun: true }))
+
+    assert.deepEqual(calls.map(([name]) => name), ["ReviewFilteredIssuesAllTeams", "ReviewFilteredIssuesAllTeams", "GetIssue"])
+    assert.deepEqual(calls[1][1], {
+      first: 50,
+      statusName: "In Review",
+      labelNames: ["reviewer:daedalus", "daedalus", "reviewer:any", "any"]
+    })
   } finally {
     globalThis.fetch = originalFetch
     console.log = originalLog
@@ -281,6 +401,7 @@ const baseConfig = (overrides = {}) => ({
   linearApiKey: "test-key",
   linearApiUrl: "https://linear.example/graphql",
   agentId: "daedalus",
+  teamKey: "RYA",
   agentLabels: ["agent:daedalus", "agent:any"],
   reviewerLabels: ["reviewer:daedalus", "reviewer:any"],
   readyStatus: "Waiting For Agent",
@@ -314,14 +435,15 @@ const linearIssue = ({
   comments = [],
   state = workflowState("state-1", "Agent In Progress", "started"),
   relations = [],
-  inverseRelations = []
+  inverseRelations = [],
+  createdAt = "2026-06-29T09:00:00.000Z"
 } = {}) => ({
   id,
   identifier,
   title: "Test issue",
   url: `https://linear.app/example/${identifier}`,
   priority: 2,
-  createdAt: "2026-06-29T09:00:00.000Z",
+  createdAt,
   updatedAt: "2026-06-29T09:00:00.000Z",
   state,
   labels: { nodes: labels },
