@@ -5,6 +5,8 @@ import { candidateIssuesQuery, type CandidateIssuesResponse } from "./linear/que
 import { commentCreateMutation, type CommentCreateResponse } from "./linear/queries/comment-create.js"
 import { getIssueQuery, type GetIssueResponse } from "./linear/queries/get-issue.js"
 import { issueUpdateMutation, type IssueUpdateResponse } from "./linear/queries/issue-update.js"
+import { reviewFilteredIssuesAllTeamsQuery, type ReviewFilteredIssuesAllTeamsResponse } from "./linear/queries/review-filtered-issues-all-teams.js"
+import { reviewFilteredIssuesQuery, type ReviewFilteredIssuesResponse } from "./linear/queries/review-filtered-issues.js"
 import { teamIssuesQuery, type TeamIssuesResponse } from "./linear/queries/team-issues.js"
 import { teamsQuery, type TeamsResponse } from "./linear/queries/teams.js"
 import { workflowStatesQuery, type WorkflowStatesResponse } from "./linear/queries/workflow-states.js"
@@ -31,15 +33,7 @@ export class LinearClient {
   }
 
   async getReviewCandidateIssues(): Promise<LinearIssue[]> {
-    const issues = await this.getVisibleIssues()
-
-    const candidates = issues.filter((issue) => {
-      if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
-      if (issue.state.name !== this.config.reviewReadyStatus) return false
-      return this.config.reviewerLabels.some((reviewerLabel) => issue.labels.nodes.some((label) => matchesLabel(label, reviewerLabel)))
-    })
-
-    return candidates.sort(compareIssues)
+    return this.getFilteredReviewIssues(this.config.reviewReadyStatus)
   }
 
   async getRunningIssues(): Promise<LinearIssue[]> {
@@ -50,10 +44,7 @@ export class LinearClient {
   }
 
   async getReviewRunningIssues(): Promise<LinearIssue[]> {
-    return (await this.getVisibleIssues()).filter((issue) => {
-      if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
-      return issue.state.name === this.config.reviewRunningStatus
-    })
+    return this.getFilteredReviewIssues(this.config.reviewRunningStatus)
   }
 
   private async getVisibleIssues(): Promise<LinearIssue[]> {
@@ -76,6 +67,35 @@ export class LinearClient {
       first: this.config.fetchLimit
     })
     return data.team.issues.nodes
+  }
+
+  private async getFilteredReviewIssues(statusName: string): Promise<LinearIssue[]> {
+    const data = await this.getFilteredReviewIssuePage(statusName)
+
+    const candidates = data.issues.nodes.filter((issue) =>
+      issue.state.name === statusName &&
+      (!this.config.teamKey || issue.team.key === this.config.teamKey) &&
+      this.config.reviewerLabels.some((reviewerLabel) => issue.labels.nodes.some((label) => matchesLabel(label, reviewerLabel)))
+    )
+
+    return candidates.sort(compareIssues)
+  }
+
+  private async getFilteredReviewIssuePage(statusName: string): Promise<ReviewFilteredIssuesResponse | ReviewFilteredIssuesAllTeamsResponse> {
+    const commonVariables = {
+      first: this.config.fetchLimit,
+      statusName,
+      labelNames: reviewLabelFilterNames(this.config.reviewerLabels)
+    }
+
+    if (!this.config.teamKey) {
+      return this.api.request<ReviewFilteredIssuesAllTeamsResponse>(reviewFilteredIssuesAllTeamsQuery, commonVariables)
+    }
+
+    return this.api.request<ReviewFilteredIssuesResponse>(reviewFilteredIssuesQuery, {
+      ...commonVariables,
+      teamKey: this.config.teamKey
+    })
   }
 
   private async getTeamIdByKey(teamKey: string): Promise<string> {
@@ -142,3 +162,9 @@ export class LinearClient {
     if (!data.commentCreate.success) throw new Error(`Linear commentCreate returned success=false for ${issueId}`)
   }
 }
+
+const reviewLabelFilterNames = (reviewerLabels: string[]): string[] =>
+  [...new Set(reviewerLabels.flatMap((label) => {
+    const [, childName] = label.split(":", 2)
+    return childName ? [label, childName] : [label]
+  }))]

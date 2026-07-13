@@ -70,7 +70,7 @@ async function selectReviewIssue(config: Config, linear: ReviewLinearClient): Pr
     return validateExplicitReviewIssue(config, issue) ? issue : null
   }
 
-  const candidates = await linear.getReviewCandidateIssues()
+  const candidates = await getDetailedReviewCandidates(linear)
   return candidates.find((issue) => {
     const blockers = getUnresolvedBlockers(issue)
     if (blockers.length === 0) return true
@@ -80,6 +80,11 @@ async function selectReviewIssue(config: Config, linear: ReviewLinearClient): Pr
     )
     return false
   }) ?? null
+}
+
+async function getDetailedReviewCandidates(linear: ReviewLinearClient): Promise<LinearIssue[]> {
+  const candidates = await linear.getReviewCandidateIssues()
+  return Promise.all(candidates.map((issue) => linear.getIssue(issue.id)))
 }
 
 function validateExplicitReviewIssue(config: Config, issue: LinearIssue): boolean {
