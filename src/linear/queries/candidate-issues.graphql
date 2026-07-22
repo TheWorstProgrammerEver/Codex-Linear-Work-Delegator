@@ -1,12 +1,18 @@
-query CandidateIssues($first: Int!, $statusName: String!) {
+query CandidateIssues($first: Int!, $after: String, $statusName: String!, $labelNames: [String!]!) {
   issues(
     first: $first
+    after: $after
     filter: {
       state: { name: { eq: $statusName } }
+      labels: { name: { in: $labelNames } }
     }
   ) {
     nodes {
       {{ issueFields }}
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }

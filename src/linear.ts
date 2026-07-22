@@ -21,7 +21,7 @@ export class LinearClient {
   }
 
   async getCandidateIssues(): Promise<LinearIssue[]> {
-    const issues = await this.getVisibleIssues()
+    const issues = await this.getFilteredIssues(this.config.readyStatus, issueLabelFilterNames(this.config.agentLabels))
 
     const candidates = issues.filter((issue) => {
       if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
@@ -37,7 +37,7 @@ export class LinearClient {
   }
 
   async getRunningIssues(): Promise<LinearIssue[]> {
-    return (await this.getVisibleIssues()).filter((issue) => {
+    return (await this.getFilteredIssues(this.config.runningStatus, healthCheckLabelFilterNames(this.config))).filter((issue) => {
       if (this.config.teamKey && issue.team.key !== this.config.teamKey) return false
       return issue.state.name === this.config.runningStatus
     })
@@ -47,28 +47,56 @@ export class LinearClient {
     return this.getFilteredReviewIssues(this.config.reviewRunningStatus)
   }
 
-  private async getVisibleIssues(): Promise<LinearIssue[]> {
+  private async getFilteredIssues(statusName: string, labelNames: string[]): Promise<LinearIssue[]> {
     return this.config.teamKey
-      ? this.getTeamIssues(this.config.teamKey)
-      : this.getAllVisibleIssues()
+      ? this.getTeamIssues(this.config.teamKey, statusName, labelNames)
+      : this.getAllVisibleIssues(statusName, labelNames)
   }
 
-  private async getAllVisibleIssues(): Promise<LinearIssue[]> {
-    const data = await this.api.request<CandidateIssuesResponse>(candidateIssuesQuery, {
-      first: this.config.fetchLimit,
-      statusName: this.config.readyStatus
+  private async getAllVisibleIssues(statusName: string, labelNames: string[]): Promise<LinearIssue[]> {
+    return this.collectIssuePages(async (after) => {
+      const data = await this.api.request<CandidateIssuesResponse>(candidateIssuesQuery, {
+        first: this.config.fetchLimit,
+        after,
+        statusName,
+        labelNames
+      })
+      return data.issues
     })
-    return data.issues.nodes
   }
 
-  private async getTeamIssues(teamKey: string): Promise<LinearIssue[]> {
-    const teamId = await this.getTeamIdByKey(teamKey)
-    const data = await this.api.request<TeamIssuesResponse>(teamIssuesQuery, {
-      id: teamId,
-      first: this.config.fetchLimit,
-      statusName: this.config.readyStatus
+  private async getTeamIssues(teamKey: string, statusName: string, labelNames: string[]): Promise<LinearIssue[]> {
+    return this.collectIssuePages(async (after) => {
+      const data = await this.api.request<TeamIssuesResponse>(teamIssuesQuery, {
+        first: this.config.fetchLimit,
+        after,
+        teamKey,
+        statusName,
+        labelNames
+      })
+      return data.issues
     })
-    return data.team.issues.nodes
+  }
+
+  private async collectIssuePages(
+    requestPage: (after: string | null) => Promise<CandidateIssuesResponse["issues"]>
+  ): Promise<LinearIssue[]> {
+    const issues: LinearIssue[] = []
+    let after: string | null = null
+    let hasNextPage = true
+
+    do {
+      const page = await requestPage(after)
+      issues.push(...page.nodes)
+      after = page.pageInfo.endCursor
+      hasNextPage = page.pageInfo.hasNextPage
+
+      if (hasNextPage && !after) {
+        throw new Error("Linear issue page reported hasNextPage=true without endCursor")
+      }
+    } while (hasNextPage)
+
+    return issues
   }
 
   private async getFilteredReviewIssues(statusName: string): Promise<LinearIssue[]> {
@@ -165,8 +193,13 @@ export class LinearClient {
   }
 }
 
-const reviewLabelFilterNames = (reviewerLabels: string[]): string[] =>
-  [...new Set(reviewerLabels.flatMap((label) => {
+const issueLabelFilterNames = (labels: string[]): string[] =>
+  [...new Set(labels.flatMap((label) => {
     const [, childName] = label.split(":", 2)
     return childName ? [label, childName] : [label]
   }))]
+
+const reviewLabelFilterNames = issueLabelFilterNames
+
+const healthCheckLabelFilterNames = (config: Config): string[] =>
+  issueLabelFilterNames([`agent:${config.agentId}`, "agent:any"])

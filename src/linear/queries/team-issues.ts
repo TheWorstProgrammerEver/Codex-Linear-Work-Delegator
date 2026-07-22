@@ -7,5 +7,11 @@ export const teamIssuesQuery = renderTemplateFile(new URL("./team-issues.graphql
 })
 
 export interface TeamIssuesResponse {
-  team: { issues: { nodes: LinearIssue[] } }
+  issues: {
+    nodes: LinearIssue[]
+    pageInfo: {
+      hasNextPage: boolean
+      endCursor: string | null
+    }
+  }
 }
