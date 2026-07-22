@@ -267,6 +267,22 @@ The startup health check treats labels configured in `CODEX_LINEAR_AGENT_LABELS`
 
 When the startup health check finds an `Agent In Progress` issue without active local worker state, it comments for manual reconciliation instead of treating the work as failed. Operators or later agents should check issue comments, durable job state files, service/timer units, detached sessions, partial artifacts, and logs. If a durable job is active or resumable, leave the issue running and add a lightweight status comment with the current state and next resume/reconcile command. If the artifact validates, finish the issue normally. If recovery needs outside input, comment with the concrete blocker and move the issue to `Blocked`.
 
+Organic work discovery uses a server-side Linear GraphQL filter before
+pagination: the configured ready status and agent labels are applied by Linear
+first, and `CODEX_LINEAR_TEAM_KEY` is included in the server-side query when it
+is configured. The runner paginates through all matching candidate pages before
+local dependency filtering declares that no eligible work exists, so a blocked
+newer candidate should not starve an older unblocked candidate. Dependency
+checks remain conservative: issues blocked by unresolved blockers are skipped,
+while blockers whose status type is `completed` or `canceled` are treated as
+resolved.
+
+`CODEX_LINEAR_FETCH_LIMIT` is the page size for these filtered work-candidate
+queries and defaults to `50`. It is a fallback tuning knob for Linear query
+complexity or operator diagnostics; increasing it should not be required for
+correctness because the worker keeps paginating filtered results, and lowering
+it can be used temporarily if Linear rejects a query for complexity.
+
 Codex is instructed to update Linear when complete or blocked:
 
 - move to `In Review` with a summary when complete;
