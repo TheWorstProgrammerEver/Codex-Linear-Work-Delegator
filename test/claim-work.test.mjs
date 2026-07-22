@@ -157,15 +157,25 @@ test("claim skips blocked candidates and claims the next eligible issue", async 
   })
   const comments = []
   const updates = []
+  const calls = []
   const logs = []
   const originalFetch = globalThis.fetch
   const originalLog = console.log
   globalThis.fetch = async (_url, init) => {
     const body = JSON.parse(init.body)
     if (body.query.includes("query CandidateIssues")) {
-      assert.equal(body.variables.statusName, "Waiting For Agent")
+      calls.push(["CandidateIssues", body.variables])
       assert.match(body.query, /state:\s*\{\s*name:\s*\{\s*eq:\s*\$statusName\s*\}/)
-      return jsonResponse({ data: { issues: { nodes: [blocked, claimable] } } })
+      assert.match(body.query, /labels:\s*\{\s*name:\s*\{\s*in:\s*\$labelNames\s*\}/)
+      assert.deepEqual(body.variables.labelNames, ["agent:daedalus", "daedalus", "agent:any", "any"])
+
+      return jsonResponse({
+        data: {
+          issues: body.variables.statusName === "Waiting For Agent"
+            ? issuePage([blocked, claimable])
+            : issuePage([])
+        }
+      })
     }
     if (body.query.includes("query WorkflowStates")) {
       return jsonResponse({
@@ -213,10 +223,147 @@ test("claim skips blocked candidates and claims the next eligible issue", async 
     const result = await claimNextIssue(baseConfig({ stateDir }))
 
     assert.equal(result.identifier, "RYA-2")
+    assert.deepEqual(calls.map((call) => call[1].statusName), ["Agent In Progress", "Waiting For Agent"])
     assert.deepEqual(updates.map((update) => update.id), ["claimable"])
     assert.equal(comments.length, 1)
     assert.match(logs.join("\n"), /Skipping RYA-1; blocked by unresolved dependencies: RYA-0/)
     assert.match(logs.join("\n"), /Selected RYA-2/)
+  } finally {
+    globalThis.fetch = originalFetch
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("startup health check polls running issues without using the ready-status candidate filter", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-running-health-"))
+  const running = linearIssue({
+    id: "running",
+    identifier: "RYA-3",
+    state: workflowState("running", "Agent In Progress", "started"),
+    labels: [agentLabel("daedalus")]
+  })
+  const comments = []
+  const calls = []
+  const originalFetch = globalThis.fetch
+  const originalLog = console.log
+  console.log = () => {}
+
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body)
+    if (body.query.includes("query CandidateIssues")) {
+      calls.push(body.variables)
+      assert.equal(body.variables.statusName, "Agent In Progress")
+      return jsonResponse({ data: { issues: issuePage([running]) } })
+    }
+    if (body.query.includes("query GetIssue")) {
+      return jsonResponse({ data: { issue: running } })
+    }
+    if (body.query.includes("mutation CommentCreate")) {
+      comments.push(body.variables.input)
+      return jsonResponse({ data: { commentCreate: { success: true, comment: { id: "comment-1" } } } })
+    }
+    throw new Error(`Unexpected query: ${body.query}`)
+  }
+
+  try {
+    const result = await claimNextIssue(baseConfig({ stateDir }))
+
+    assert.equal(result, null)
+    assert.deepEqual(calls.map((variables) => variables.statusName), ["Agent In Progress"])
+    assert.equal(comments.length, 1)
+    assert.equal(comments[0].issueId, "running")
+  } finally {
+    globalThis.fetch = originalFetch
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("claim paginates filtered team candidates before declaring no eligible work", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-candidate-pages-"))
+  const blocked = linearIssue({
+    id: "blocked",
+    identifier: "RYA-10",
+    state: workflowState("ready", "Waiting For Agent", "unstarted"),
+    labels: [agentLabel("daedalus")],
+    inverseRelations: [
+      blocksRelation(
+        dependencyIssue("RYA-9", workflowState("running", "Agent In Progress", "started")),
+        "RYA-10"
+      )
+    ]
+  })
+  const claimable = linearIssue({
+    id: "claimable",
+    identifier: "RYA-11",
+    state: workflowState("ready", "Waiting For Agent", "unstarted"),
+    labels: [agentLabel("daedalus")],
+    createdAt: "2026-06-30T09:00:00.000Z"
+  })
+  const calls = []
+  const updates = []
+  const comments = []
+  const originalFetch = globalThis.fetch
+  const originalLog = console.log
+  console.log = () => {}
+
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body)
+    if (body.query.includes("query TeamIssues")) {
+      calls.push(body.variables)
+      assert.equal(body.variables.teamKey, "RYA")
+      assert.equal(body.variables.first, 1)
+      assert.deepEqual(body.variables.labelNames, ["agent:daedalus", "daedalus", "agent:any", "any"])
+
+      if (body.variables.statusName === "Agent In Progress") {
+        return jsonResponse({ data: { issues: issuePage([]) } })
+      }
+      if (body.variables.after === null) {
+        return jsonResponse({ data: { issues: issuePage([blocked], true, "cursor-1") } })
+      }
+      return jsonResponse({ data: { issues: issuePage([claimable]) } })
+    }
+    if (body.query.includes("query WorkflowStates")) {
+      return jsonResponse({
+        data: {
+          workflowStates: {
+            nodes: [workflowState("running", "Agent In Progress", "started", claimable.team)]
+          }
+        }
+      })
+    }
+    if (body.query.includes("mutation IssueUpdate")) {
+      updates.push(body.variables)
+      return jsonResponse({ data: { issueUpdate: { success: true, issue: claimable } } })
+    }
+    if (body.query.includes("mutation CommentCreate")) {
+      comments.push(body.variables.input)
+      return jsonResponse({ data: { commentCreate: { success: true, comment: { id: "comment-1" } } } })
+    }
+    if (body.query.includes("query GetIssue")) {
+      return jsonResponse({
+        data: {
+          issue: {
+            ...claimable,
+            state: workflowState("running", "Agent In Progress", "started")
+          }
+        }
+      })
+    }
+    throw new Error(`Unexpected query: ${body.query}`)
+  }
+
+  try {
+    const result = await claimNextIssue(baseConfig({ stateDir, teamKey: "RYA", fetchLimit: 1 }))
+
+    assert.equal(result.identifier, "RYA-11")
+    assert.deepEqual(
+      calls.map((variables) => [variables.statusName, variables.after]),
+      [["Agent In Progress", null], ["Waiting For Agent", null], ["Waiting For Agent", "cursor-1"]]
+    )
+    assert.deepEqual(updates.map((update) => update.id), ["claimable"])
+    assert.equal(comments.length, 1)
   } finally {
     globalThis.fetch = originalFetch
     console.log = originalLog
@@ -312,3 +459,8 @@ const jsonResponse = (body) =>
     status: 200,
     headers: { "Content-Type": "application/json" }
   })
+
+const issuePage = (nodes, hasNextPage = false, endCursor = null) => ({
+  nodes,
+  pageInfo: { hasNextPage, endCursor }
+})

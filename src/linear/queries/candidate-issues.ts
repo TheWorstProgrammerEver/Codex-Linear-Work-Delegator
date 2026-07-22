@@ -7,5 +7,11 @@ export const candidateIssuesQuery = renderTemplateFile(new URL("./candidate-issu
 })
 
 export interface CandidateIssuesResponse {
-  issues: { nodes: LinearIssue[] }
+  issues: {
+    nodes: LinearIssue[]
+    pageInfo: {
+      hasNextPage: boolean
+      endCursor: string | null
+    }
+  }
 }

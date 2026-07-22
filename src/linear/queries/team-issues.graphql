@@ -1,14 +1,19 @@
-query TeamIssues($id: String!, $first: Int!, $statusName: String!) {
-  team(id: $id) {
-    issues(
-      first: $first
-      filter: {
-        state: { name: { eq: $statusName } }
-      }
-    ) {
-      nodes {
-        {{ issueFields }}
-      }
+query TeamIssues($first: Int!, $after: String, $teamKey: String!, $statusName: String!, $labelNames: [String!]!) {
+  issues(
+    first: $first
+    after: $after
+    filter: {
+      team: { key: { eq: $teamKey } }
+      state: { name: { eq: $statusName } }
+      labels: { name: { in: $labelNames } }
+    }
+  ) {
+    nodes {
+      {{ issueFields }}
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
