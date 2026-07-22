@@ -55,7 +55,8 @@ export class LinearClient {
 
   private async getAllVisibleIssues(): Promise<LinearIssue[]> {
     const data = await this.api.request<CandidateIssuesResponse>(candidateIssuesQuery, {
-      first: this.config.fetchLimit
+      first: this.config.fetchLimit,
+      statusName: this.config.readyStatus
     })
     return data.issues.nodes
   }
@@ -64,7 +65,8 @@ export class LinearClient {
     const teamId = await this.getTeamIdByKey(teamKey)
     const data = await this.api.request<TeamIssuesResponse>(teamIssuesQuery, {
       id: teamId,
-      first: this.config.fetchLimit
+      first: this.config.fetchLimit,
+      statusName: this.config.readyStatus
     })
     return data.team.issues.nodes
   }

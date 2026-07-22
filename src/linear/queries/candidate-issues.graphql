@@ -1,5 +1,10 @@
-query CandidateIssues($first: Int!) {
-  issues(first: $first) {
+query CandidateIssues($first: Int!, $statusName: String!) {
+  issues(
+    first: $first
+    filter: {
+      state: { name: { eq: $statusName } }
+    }
+  ) {
     nodes {
       {{ issueFields }}
     }

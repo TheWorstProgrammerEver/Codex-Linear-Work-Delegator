@@ -163,6 +163,8 @@ test("claim skips blocked candidates and claims the next eligible issue", async 
   globalThis.fetch = async (_url, init) => {
     const body = JSON.parse(init.body)
     if (body.query.includes("query CandidateIssues")) {
+      assert.equal(body.variables.statusName, "Waiting For Agent")
+      assert.match(body.query, /state:\s*\{\s*name:\s*\{\s*eq:\s*\$statusName\s*\}/)
       return jsonResponse({ data: { issues: { nodes: [blocked, claimable] } } })
     }
     if (body.query.includes("query WorkflowStates")) {

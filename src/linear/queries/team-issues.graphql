@@ -1,6 +1,11 @@
-query TeamIssues($id: String!, $first: Int!) {
+query TeamIssues($id: String!, $first: Int!, $statusName: String!) {
   team(id: $id) {
-    issues(first: $first) {
+    issues(
+      first: $first
+      filter: {
+        state: { name: { eq: $statusName } }
+      }
+    ) {
       nodes {
         {{ issueFields }}
       }
