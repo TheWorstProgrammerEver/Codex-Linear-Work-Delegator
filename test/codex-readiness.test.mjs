@@ -56,6 +56,52 @@ test("readiness closes probe stdin instead of leaving Codex waiting for appended
   }
 })
 
+test("readiness child receives only Codex auth and process-startup environment", async () => {
+  const restoreEnv = replaceEnv({
+    CODEX_ACCESS_TOKEN: "codex-access-sentinel",
+    CODEX_API_KEY: "codex-api-sentinel",
+    CODEX_GITHUB_ENV: "/private/github-profile-sentinel",
+    CODEX_HOME: "/private/codex-home-sentinel",
+    CODEX_LINEAR_AGENT: "worker-config-sentinel",
+    HOME: "/private/home-sentinel",
+    LINEAR_API_KEY: "linear-api-sentinel",
+    OPENAI_API_KEY: "openai-api-sentinel",
+    OPENAI_ORGANIZATION: "openai-organization-sentinel",
+    READINESS_UNRELATED_SENTINEL: "unrelated-worker-sentinel"
+  })
+  const fixture = createProbeFixture([
+    jsonEvent({
+      type: "item.completed",
+      item: { id: "item-1", type: "agent_message", text: "CODEX_AUTH_READY" }
+    }),
+    jsonEvent({ type: "turn.completed", usage: {} })
+  ], 0, [
+    '[[ "${CODEX_ACCESS_TOKEN:-}" == "codex-access-sentinel" ]] || exit 9',
+    '[[ "${CODEX_API_KEY:-}" == "codex-api-sentinel" ]] || exit 10',
+    '[[ "${CODEX_HOME:-}" == "/private/codex-home-sentinel" ]] || exit 11',
+    '[[ "${HOME:-}" == "/private/home-sentinel" ]] || exit 19',
+    '[[ "${OPENAI_API_KEY:-}" == "openai-api-sentinel" ]] || exit 12',
+    '[[ "${OPENAI_ORGANIZATION:-}" == "openai-organization-sentinel" ]] || exit 18',
+    '[[ -n "${PATH:-}" ]] || exit 13',
+    '[[ -z "${LINEAR_API_KEY+x}" ]] || exit 14',
+    '[[ -z "${CODEX_LINEAR_AGENT+x}" ]] || exit 15',
+    '[[ -z "${CODEX_GITHUB_ENV+x}" ]] || exit 16',
+    '[[ -z "${READINESS_UNRELATED_SENTINEL+x}" ]] || exit 17'
+  ])
+
+  try {
+    const result = await checkCodexReadiness({
+      codexBin: fixture.bin,
+      model: "test-model"
+    })
+
+    assert.deepEqual(result, { ready: true, code: "ready" })
+  } finally {
+    fixture.cleanup()
+    restoreEnv()
+  }
+})
+
 test("readiness classifies a structured immediate 401 without returning raw output", async () => {
   const fixture = createProbeFixture(
     [jsonEvent({ type: "error", message: "unexpected status 401 Unauthorized: request rejected" })],
@@ -190,3 +236,18 @@ function createProbeFixture(events, exitCode = 0, prelude = []) {
 }
 
 const jsonEvent = (event) => JSON.stringify(event)
+
+function replaceEnv(replacements) {
+  const previous = new Map(
+    Object.keys(replacements).map((key) => [key, process.env[key]])
+  )
+
+  Object.assign(process.env, replacements)
+
+  return () => {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}

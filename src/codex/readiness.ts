@@ -39,6 +39,17 @@ const AUTH_ERROR_PATTERNS = [
   /\b401\b[^\n]{0,120}\b(?:unauthorized|authentication)\b/i,
   /\b(?:authentication failed|not authenticated|invalid api key|invalid_api_key)\b/i
 ]
+// The systemd service environment also contains Linear and runner configuration.
+// Keep the pre-claim child limited to Codex authentication and process startup.
+const READINESS_ENV_KEYS = [
+  "CODEX_ACCESS_TOKEN",
+  "CODEX_API_KEY",
+  "CODEX_HOME",
+  "HOME",
+  "OPENAI_API_KEY",
+  "OPENAI_ORGANIZATION",
+  "PATH"
+] as const
 
 export async function checkCodexReadiness(
   descriptor: CodexReadinessDescriptor
@@ -51,6 +62,7 @@ export async function checkCodexReadiness(
     try {
       const probe = spawnSync(descriptor.codexBin, args, {
         encoding: "utf8",
+        env: buildReadinessEnv(),
         input: "",
         maxBuffer: 256 * 1024,
         timeout: 90_000
@@ -80,6 +92,14 @@ export const buildCodexReadinessArgs = (
   "--cd", probeDir,
   PROBE_PROMPT
 ]
+
+const buildReadinessEnv = (): NodeJS.ProcessEnv =>
+  Object.fromEntries(
+    READINESS_ENV_KEYS.flatMap((key) => {
+      const value = process.env[key]
+      return value === undefined ? [] : [[key, value]]
+    })
+  )
 
 function classifyProbeOutput(
   stdout: string,
