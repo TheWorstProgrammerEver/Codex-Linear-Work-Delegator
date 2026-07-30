@@ -62,6 +62,11 @@ the private directories:
 - audit: `/var/log/codex-usage-reset-steward`, mode `0700`;
 - runtime lock: `/run/codex-usage-reset-steward`, mode `0700`.
 
+The installer creates a root-owned `codex-home` symlink in the steward
+configuration directory. The unit uses that trusted alias to allow the local
+app-server to write only in the designated user's existing Codex home.
+Authentication material remains there and is neither copied nor logged.
+
 State and audit files are mode `0600`. State publication writes, synchronizes,
 renames, and synchronizes the containing directory before an external consume
 effect. The state parser validates phase relationships, policy identity, file

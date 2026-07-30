@@ -94,7 +94,10 @@ The installer refuses a dirty checkout, exports the exact Git commit into a
 private temporary directory, and rebuilds there as the unprivileged designated
 user. It never installs the checkout's ignored `dist/` bytes. The immutable
 release retains the compiled CLI, policy, and systemd units from that reviewed
-tree.
+tree. A root-owned `codex-home` symlink under the steward's `/etc` directory
+lets the systemd namespace grant the designated user's existing Codex home the
+minimum write access app-server requires. Authentication material remains in
+that existing home and is neither copied nor logged.
 
 The installed units are:
 

@@ -77,6 +77,13 @@ ln -s -- "$release" "$next_link"
 mv -Tf -- "$next_link" "$install_root/current"
 
 install -d -m 0755 -- /etc/codex-usage-reset-steward
+codex_home_link="/etc/codex-usage-reset-steward/codex-home"
+if [[ -e "$codex_home_link" && ! -L "$codex_home_link" ]]; then
+  printf 'Refusing to replace non-symlink Codex home allowlist path.\n' >&2
+  exit 73
+fi
+ln -sfn -- "$agent_home/.codex" "$codex_home_link"
+chown -h root:root "$codex_home_link"
 install -m 0644 -- \
   "$release/config/policy.default.json" \
   /etc/codex-usage-reset-steward/policy.json
