@@ -3,7 +3,7 @@ Description=Schedule the Codex earned usage reset steward
 
 [Timer]
 OnBootSec=10min
-OnUnitInactiveSec=5min
+OnCalendar=*:0/5
 RandomizedDelaySec=30
 Persistent=true
 Unit=codex-usage-reset-steward.service

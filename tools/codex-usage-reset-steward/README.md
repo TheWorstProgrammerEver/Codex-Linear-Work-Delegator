@@ -99,7 +99,9 @@ lets the systemd namespace grant the designated user's existing Codex home the
 minimum write access app-server requires. Authentication material remains in
 that existing home and is neither copied nor logged. Every install pass
 reloads, enables, and restarts the timer so a dry-run-to-consume reinstall
-cannot leave an elapsed timer without a future trigger.
+cannot leave an elapsed timer without a future trigger. The five-minute
+calendar cadence is independent of service activation, so a kill-switch
+condition skip cannot remove all future triggers.
 
 The installed units are:
 
