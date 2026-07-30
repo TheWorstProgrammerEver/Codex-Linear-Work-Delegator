@@ -27,9 +27,15 @@ export interface LinearIssue {
   }
   relations?: {
     nodes: LinearIssueDependency[]
+    pageInfo?: {
+      hasNextPage: boolean
+    }
   }
   inverseRelations?: {
     nodes: LinearIssueDependency[]
+    pageInfo?: {
+      hasNextPage: boolean
+    }
   }
   assignee?: LinearPerson | null
   creator?: LinearPerson | null

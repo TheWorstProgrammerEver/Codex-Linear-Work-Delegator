@@ -172,6 +172,7 @@ test("rejects stale or unrelated work and invalidates evidence after Linear reco
     assert.equal(buildUsageLimitEvidence(config, {
       ...issue,
       inverseRelations: {
+        pageInfo: { hasNextPage: false },
         nodes: [{
           id: "relation-1",
           type: "blocks",
@@ -180,6 +181,27 @@ test("rejects stale or unrelated work and invalidates evidence after Linear reco
         }]
       }
     }, "work", NOW), null)
+
+    const firstRelationPage = Array.from({ length: 50 }, (_, index) => ({
+      id: `relation-${index}`,
+      type: "blocks",
+      issue: dependencyIssue(`RYA-${index + 1000}`, "Done", "completed"),
+      relatedIssue: dependencyIssue("RYA-217", "Agent In Progress", "started")
+    }))
+    assert.equal(buildUsageLimitEvidence(config, {
+      ...issue,
+      inverseRelations: {
+        nodes: firstRelationPage,
+        pageInfo: { hasNextPage: true }
+      }
+    }, "work", NOW), null, "a later unresolved blocker may be hidden beyond the first page")
+    assert.equal(buildUsageLimitEvidence(config, {
+      ...issue,
+      relations: {
+        nodes: [],
+        pageInfo: { hasNextPage: true }
+      }
+    }, "work", NOW), null, "either truncated dependency direction fails closed")
 
     const valid = buildUsageLimitEvidence(config, issue, "work", NOW)
     assert.ok(valid)
@@ -270,8 +292,8 @@ const linearIssue = () => ({
     }]
   },
   team: { id: "team-1", key: "RYA", name: "Ryan Hayward" },
-  relations: { nodes: [] },
-  inverseRelations: { nodes: [] }
+  relations: { nodes: [], pageInfo: { hasNextPage: false } },
+  inverseRelations: { nodes: [], pageInfo: { hasNextPage: false } }
 })
 
 const dependencyIssue = (identifier, name, type) => ({

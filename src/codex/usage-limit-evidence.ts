@@ -320,7 +320,13 @@ function isEligibleIssue(
   )
   return issue.state.name === expectedStatus
     && hasEligibleLabel
+    && hasCompleteDependencySnapshot(issue)
     && getUnresolvedBlockers(issue).length === 0
+}
+
+function hasCompleteDependencySnapshot(issue: LinearIssue): boolean {
+  return issue.relations?.pageInfo?.hasNextPage === false
+    && issue.inverseRelations?.pageInfo?.hasNextPage === false
 }
 
 function preparePrivateDirectory(path: string): void {
