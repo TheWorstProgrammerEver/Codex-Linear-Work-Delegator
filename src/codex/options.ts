@@ -45,6 +45,7 @@ export const getCodexModel = (config: Config, issue: LinearIssue): string =>
 
 export const buildCodexArgs = (config: Config, options: CodexLaunchOptions, prompt: string): string[] => [
   "exec",
+  "--json",
   "--model", options.model,
   ...reasoningArgs(options.reasoningEffort),
   ...speedArgs(options.speed),

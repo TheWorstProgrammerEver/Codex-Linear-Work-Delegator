@@ -1,0 +1,41 @@
+[Unit]
+Description=Codex earned usage reset steward
+After=network-online.target systemd-time-wait-sync.service
+Wants=network-online.target systemd-time-wait-sync.service
+ConditionPathExists=!/etc/codex-usage-reset-steward/disabled
+
+[Service]
+Type=oneshot
+User=daedalus
+Group=daedalus
+WorkingDirectory=/opt/codex-usage-reset-steward/current
+ExecStart=/opt/codex-usage-reset-steward/current/dist/src/cli.js run
+EnvironmentFile=/etc/codex-usage-reset-steward/steward.env
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+UMask=0077
+StateDirectory=codex-usage-reset-steward
+StateDirectoryMode=0700
+LogsDirectory=codex-usage-reset-steward
+LogsDirectoryMode=0700
+RuntimeDirectory=codex-usage-reset-steward
+RuntimeDirectoryMode=0700
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.codex
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+DevicePolicy=closed
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

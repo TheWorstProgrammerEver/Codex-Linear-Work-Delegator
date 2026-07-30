@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "2026-07-30.v1",
+  "sourceDefaultMode": "dry-run",
+  "designatedOwner": "daedalus",
+  "allowedEvidenceAgents": [
+    "daedalus",
+    "momus"
+  ],
+  "limitId": "codex",
+  "evidenceMaxAgeMinutes": 15,
+  "minimumNaturalResetDelayHours": 8,
+  "unattendedWindow": {
+    "startHour": 22,
+    "endHour": 7,
+    "timeZone": "Australia/Perth"
+  },
+  "minimumCreditValidityMinutes": 5,
+  "minimumConsumptionIntervalHours": 24,
+  "maximumPendingAgeMinutes": 120,
+  "maximumClockSkewSeconds": 120
+}

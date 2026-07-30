@@ -190,6 +190,35 @@ Model labels, including `agent:model:gpt-5.3-codex-spark`, only select the Codex
 - `attached` is the default production mode. The wrapper starts `codex exec` as a normal child process and waits until it exits. `CODEX_LINEAR_WAIT_TIMEOUT_SECONDS` is ignored in this mode.
 - `detached` preserves the older bounded-wait behavior for compatibility and testing. The wrapper detaches `codex exec`, waits up to `CODEX_LINEAR_WAIT_TIMEOUT_SECONDS`, then returns without killing the child. The child PID stays in local state so the next scheduled run can see that work is still active.
 
+## Structured usage-limit evidence
+
+Attached work and review runs start `codex exec --json`. After the child exits,
+the delegator reads only its structured `thread.started` identifier, opens the
+local authenticated Codex app-server over stdio, and calls `thread/read` with
+turns included. It publishes blockage evidence only when the latest failed turn
+contains the exact `codexErrorInfo: "usageLimitExceeded"` discriminator.
+Message text, exit codes, and model judgment cannot satisfy this gate.
+
+Before publishing, the producer refreshes the Linear issue and requires the
+expected `Agent In Progress` or `Agent Reviewing` state, a matching
+agent/reviewer label, and no unresolved blocker relation. It writes the shared
+evidence document atomically with private modes at
+`CODEX_LINEAR_USAGE_LIMIT_EVIDENCE_FILE`. Work and review profiles intentionally
+share this path even though their process-state directories remain separate.
+Each scheduler poll removes expired evidence or evidence whose Linear work is
+no longer eligible, and each new Codex launch clears prior evidence before
+testing the account again.
+
+The app-server verifier receives only the Codex authentication/startup
+environment allowlist; it does not receive `LINEAR_API_KEY`. Evidence excludes
+prompts, descriptions, error messages, log paths, thread IDs, PIDs, tokens,
+account values, and reset-credit details.
+
+Detached compatibility mode cannot observe a child that exits after its
+bounded parent wait, so it cannot publish this evidence on that later exit.
+Hosts that enable the usage reset steward must retain the committed/default
+`attached` execution mode for both work and review runners.
+
 ## Long-Running Resumable Jobs
 
 Some Linear issues involve external work that can outlive a Codex session: large downloads, backups, imports, migrations, builds, or data-processing jobs. The spawned worker prompt tells agents not to foreground-monitor these jobs for hours. The Codex session should set up durable local execution, record recovery state, and yield once the next action is clear.
@@ -269,7 +298,9 @@ When an issue is claimed, the CLI:
 5. adds a concise claim comment;
 6. fetches a compact claim-time issue snapshot with bounded description/comment text and lightweight status, label, team, assignee, project, cycle, and dependency context;
 7. writes local state under `CODEX_LINEAR_STATE_DIR`;
-8. spawns `codex exec` for the issue with that compact fallback snapshot in the prompt.
+8. spawns `codex exec --json` for the issue with that compact fallback snapshot in the prompt;
+9. after an attached exit, verifies any usage-limit classification through
+   app-server and atomically publishes or invalidates the shared evidence file.
 
 The readiness probe uses the issue's `agent:model:*` selection, falling back to
 `CODEX_LINEAR_DEFAULT_MODEL`, and the worker's normal Codex authentication

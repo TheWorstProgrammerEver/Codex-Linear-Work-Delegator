@@ -14,6 +14,7 @@ const withTempConfig = (contents, callback) => {
     "CODEX_LINEAR_CODEX_EXEC_MODE",
     "CODEX_LINEAR_REVIEWER_LABELS",
     "CODEX_LINEAR_STATE_DIR",
+    "CODEX_LINEAR_USAGE_LIMIT_EVIDENCE_FILE",
     "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"
   ])
 
@@ -98,6 +99,11 @@ test("committed defaults keep work and review state directories separate", () =>
 
     assert.equal(work.stateDir, join(home, ".local", "state", "codex-linear-work-delegator"))
     assert.equal(review.stateDir, join(home, ".local", "state", "codex-linear-review-delegator"))
+    assert.equal(
+      work.usageLimitEvidenceFile,
+      join(home, ".local", "state", "codex-usage-reset-steward", "usage-limit-blocked.json")
+    )
+    assert.equal(review.usageLimitEvidenceFile, work.usageLimitEvidenceFile)
   } finally {
     restoreEnv()
     rmSync(home, { recursive: true, force: true })
@@ -108,7 +114,8 @@ test("config expands home placeholders for local paths", () => {
   withTempConfig([
     "LINEAR_API_KEY=test-key",
     "CODEX_LINEAR_CODEX_CWD=$HOME",
-    "CODEX_LINEAR_STATE_DIR=${HOME}/.local/state/codex-linear-work-delegator"
+    "CODEX_LINEAR_STATE_DIR=${HOME}/.local/state/codex-linear-work-delegator",
+    "CODEX_LINEAR_USAGE_LIMIT_EVIDENCE_FILE=~/.local/state/codex-usage-reset-steward/usage-limit-blocked.json"
   ].join("\n"), (cwd) => {
     const restoreEnv = cleanEnv(["HOME"])
     process.env.HOME = join(cwd, "my-user")
@@ -118,6 +125,10 @@ test("config expands home placeholders for local paths", () => {
 
       assert.equal(config.codexCwd, join(cwd, "my-user"))
       assert.equal(config.stateDir, join(cwd, "my-user", ".local", "state", "codex-linear-work-delegator"))
+      assert.equal(
+        config.usageLimitEvidenceFile,
+        join(cwd, "my-user", ".local", "state", "codex-usage-reset-steward", "usage-limit-blocked.json")
+      )
     } finally {
       restoreEnv()
     }

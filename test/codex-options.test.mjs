@@ -14,6 +14,7 @@ test("no speed label leaves Codex speed config untouched", () => {
   const args = buildCodexArgs(baseConfig(), options, "prompt")
 
   assert.equal(options.speed, undefined)
+  assert.equal(args.includes("--json"), true)
   assert.doesNotMatch(args.join("\n"), /fast_mode/)
   assert.doesNotMatch(args.join("\n"), /service_tier/)
 })

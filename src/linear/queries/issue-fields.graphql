@@ -15,6 +15,7 @@ creator { id name email }
 project { id name }
 cycle { id name }
 relations(first: 50) {
+  pageInfo { hasNextPage }
   nodes {
     id
     type
@@ -23,6 +24,7 @@ relations(first: 50) {
   }
 }
 inverseRelations(first: 50) {
+  pageInfo { hasNextPage }
   nodes {
     id
     type
