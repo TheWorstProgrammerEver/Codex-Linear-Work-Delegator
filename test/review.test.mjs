@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 
+import { captureProcessIdentity } from "../dist/process-identity.js"
 import { checkAbandonedReview, getAbandonedReviews } from "../dist/review/abandoned-review.js"
 import { claimNextReview } from "../dist/review/claim-next-review.js"
 import { buildReviewPrompt } from "../dist/review/prompt.js"
@@ -64,6 +65,22 @@ test("review health check keeps already-warned reviews unresolved while skipping
 
 test("prior health warning still blocks unrelated review claims without duplicate comments", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-review-prior-warning-"))
+  const processIdentity = captureProcessIdentity(process.pid)
+  assert.ok(processIdentity)
+  writeFileSync(join(stateDir, "current.json"), JSON.stringify({
+    issueId: "stale-local-state",
+    identifier: "RYA-136",
+    url: "https://linear.app/example/RYA-136",
+    pid: process.pid,
+    model: "gpt-5.5",
+    startedAt: new Date().toISOString(),
+    logFile: join(stateDir, "review.log"),
+    purpose: "review",
+    processIdentity: {
+      ...processIdentity,
+      startTimeTicks: `${BigInt(processIdentity.startTimeTicks) + 1n}`
+    }
+  }))
   const warned = linearIssue({
     id: "warned",
     identifier: "RYA-136",

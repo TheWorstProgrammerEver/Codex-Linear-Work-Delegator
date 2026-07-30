@@ -139,6 +139,99 @@ test("startup records evidence when a detached review process disappeared", () =
   }
 })
 
+test("startup treats a reused review PID as exited", () => {
+  const fixture = recoveryFixture("codex-linear-review-pid-reuse-")
+  const currentObservation = {
+    ...fixture.processIdentity,
+    startTimeTicks: "200",
+    state: "S"
+  }
+
+  try {
+    assert.equal(recoverExitedReviewState(fixture.config, () => currentObservation), null)
+    assert.equal(readReviewRunRecord(fixture.config, "issue-1").classification, "process-missing-with-evidence")
+    assert.equal(existsSync(join(fixture.stateDir, "current.json")), false)
+  } finally {
+    rmSync(fixture.stateDir, { recursive: true, force: true })
+  }
+})
+
+test("startup treats an unreaped zombie review child as exited", () => {
+  const fixture = recoveryFixture("codex-linear-review-zombie-")
+  const zombieObservation = {
+    ...fixture.processIdentity,
+    state: "Z"
+  }
+
+  try {
+    assert.equal(recoverExitedReviewState(fixture.config, () => zombieObservation), null)
+    assert.equal(readReviewRunRecord(fixture.config, "issue-1").classification, "process-missing-with-evidence")
+    assert.equal(existsSync(join(fixture.stateDir, "current.json")), false)
+  } finally {
+    rmSync(fixture.stateDir, { recursive: true, force: true })
+  }
+})
+
+test("startup treats a dead review process leader as exited", () => {
+  const fixture = recoveryFixture("codex-linear-review-dead-")
+  const deadObservation = {
+    ...fixture.processIdentity,
+    state: "X"
+  }
+
+  try {
+    assert.equal(recoverExitedReviewState(fixture.config, () => deadObservation), null)
+    assert.equal(readReviewRunRecord(fixture.config, "issue-1").classification, "process-missing-with-evidence")
+    assert.equal(existsSync(join(fixture.stateDir, "current.json")), false)
+  } finally {
+    rmSync(fixture.stateDir, { recursive: true, force: true })
+  }
+})
+
+test("startup keeps an exact live review process identity busy", () => {
+  const fixture = recoveryFixture("codex-linear-review-live-")
+  const liveObservation = {
+    ...fixture.processIdentity,
+    state: "S"
+  }
+
+  try {
+    assert.equal(recoverExitedReviewState(fixture.config, () => liveObservation)?.identifier, "RYA-1")
+    assert.equal(readReviewRunRecord(fixture.config, "issue-1"), null)
+    assert.equal(existsSync(join(fixture.stateDir, "current.json")), true)
+  } finally {
+    rmSync(fixture.stateDir, { recursive: true, force: true })
+  }
+})
+
+const recoveryFixture = (prefix) => {
+  const stateDir = mkdtempSync(join(tmpdir(), prefix))
+  const config = baseConfig({ codexExecMode: "detached", stateDir })
+  const logFile = join(stateDir, "review.log")
+  const processIdentity = {
+    platform: "linux",
+    bootId: "test-boot",
+    pid: 41_000,
+    processGroupId: 41_000,
+    startTimeTicks: "100"
+  }
+
+  writeFileSync(logFile, "bounded review evidence")
+  writeFileSync(join(stateDir, "current.json"), JSON.stringify({
+    issueId: "issue-1",
+    identifier: "RYA-1",
+    url: "https://linear.app/example/RYA-1",
+    pid: processIdentity.pid,
+    model: "gpt-5.5",
+    startedAt: new Date().toISOString(),
+    logFile,
+    purpose: "review",
+    processIdentity
+  }))
+
+  return { config, processIdentity, stateDir }
+}
+
 const exitedChild = () => {
   const child = new EventEmitter()
   child.exitCode = 0

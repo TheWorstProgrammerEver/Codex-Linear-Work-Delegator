@@ -372,7 +372,12 @@ SHA-256 digest of at most the final 16 KiB of log bytes. They do not contain log
 excerpts, environment values, or credential material. If a detached child
 disappears before the runner observes its exit, the next startup records
 `process-missing` with the same bounded log-evidence metadata before removing
-stale current state.
+stale current state. Startup never treats the numeric PID alone as proof that
+the review is active: Linux state records include the boot ID, process-group
+ID, and `/proc` start-time ticks, and recovery requires the complete tuple to
+still identify a non-zombie, non-dead process. Missing legacy identity, reboot
+state, PID reuse, and terminal process states all enter the same visible
+recovery path.
 
 Linear status remains the routing authority: a review that moved out of
 `Agent Reviewing` is routed, while one still in that status needs operator

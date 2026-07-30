@@ -12,8 +12,10 @@ import {
   writeFileSync
 } from "node:fs"
 import { dirname, join } from "node:path"
-import { clearCurrentState, isProcessAlive, readCurrentState } from "../state.js"
+import { readLinuxProcessIdentity } from "../process-identity.js"
+import { clearCurrentState, isCurrentProcessLive, readCurrentState } from "../state.js"
 import type { Config } from "../env/types.js"
+import type { ProcessIdentityReader } from "../process-identity.js"
 import type { CurrentState } from "../state.js"
 
 const LOG_TAIL_SAMPLE_BYTES = 16 * 1024
@@ -44,9 +46,12 @@ interface TerminationDetails {
   signal: string | null
 }
 
-export function recoverExitedReviewState(config: Config): CurrentState | null {
+export function recoverExitedReviewState(
+  config: Config,
+  readIdentity: ProcessIdentityReader = readLinuxProcessIdentity
+): CurrentState | null {
   const current = readCurrentState(config)
-  if (!current || isProcessAlive(current.pid)) return current
+  if (!current || isCurrentProcessLive(current, readIdentity)) return current
 
   if (current.purpose !== "work") {
     writeReviewRunRecord(config, current, {

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 import { closeSync, mkdirSync, openSync } from "node:fs"
 import { join } from "node:path"
+import { captureProcessIdentity } from "../process-identity.js"
 import { writeCurrentState } from "../state.js"
 import { buildCodexArgs, getCodexLaunchOptions } from "./options.js"
 import { buildPrompt } from "./prompt.js"
@@ -86,7 +87,8 @@ const buildCurrentState = (
   model,
   startedAt: new Date().toISOString(),
   logFile,
-  purpose
+  purpose,
+  processIdentity: captureProcessIdentity(pid) ?? undefined
 })
 
 function logSpawn(
