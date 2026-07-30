@@ -24,6 +24,7 @@ export interface Config {
   codexExecMode: CodexExecMode
   codexExtraArgs: string[]
   stateDir: string
+  usageLimitEvidenceFile: string
   waitTimeoutMs: number
   lockStaleMs: number
   fetchLimit: number

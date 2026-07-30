@@ -7,6 +7,7 @@ import { reportReadinessFailure } from "../codex/readiness-comment.js"
 import { checkCodexReadiness, type CodexReadinessDescriptor, type CodexReadinessResult } from "../codex/readiness.js"
 import { getCodexModel } from "../codex/options.js"
 import { recoverExitedReviewState } from "./run-record.js"
+import { reconcileUsageLimitEvidence } from "../codex/usage-limit-evidence.js"
 import type { Config } from "../env/types.js"
 import type { LinearIssue } from "../linear/types.js"
 
@@ -50,6 +51,7 @@ async function claimNextReviewWithLock(
     return null
   }
 
+  await reconcileUsageLimitEvidence(config, linear)
   if (await checkAbandonedReview(config, linear)) return null
 
   const nextIssue = await selectReviewIssue(config, linear)

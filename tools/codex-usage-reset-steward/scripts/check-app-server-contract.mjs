@@ -15,6 +15,7 @@ try {
     join(root, "codex_app_server_protocol.v2.schemas.json"),
     "utf8"
   ))
+  const serializedBundle = JSON.stringify(bundle)
   const definitions = bundle.definitions
   const required = definitions.ConsumeAccountRateLimitResetCreditParams.required
   const outcomes = definitions.ConsumeAccountRateLimitResetCreditOutcome.oneOf
@@ -28,6 +29,12 @@ try {
     "alreadyRedeemed", "noCredit", "nothingToReset", "reset"
   ]))
   assert(errorVariants.includes("usageLimitExceeded"))
+  assert(serializedBundle.includes("\"thread/read\""))
+  assert(definitions.ThreadReadParams.required.includes("threadId"))
+  assert(definitions.ThreadReadParams.properties.includeTurns.type === "boolean")
+  assert(definitions.ThreadReadResponse.required.includes("thread"))
+  assert(definitions.Turn.properties.error !== undefined)
+  assert(definitions.TurnError.properties.codexErrorInfo !== undefined)
   assert(definitions.RateLimitResetCreditsSummary.required.includes("availableCount"))
   assert(definitions.GetAccountRateLimitsResponse.required.includes("rateLimits"))
   assert(definitions.RateLimitWindow.required.includes("usedPercent"))

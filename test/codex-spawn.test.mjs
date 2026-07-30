@@ -77,6 +77,34 @@ test("spawned review inherits CODEX_GITHUB_ENV for Momus GitHub helpers", async 
   }
 })
 
+test("spawn lifecycle clears stale evidence and observes the completed run", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-evidence-lifecycle-"))
+  const codexBin = join(stateDir, "fake-codex")
+  const calls = []
+  writeFileSync(codexBin, [
+    "#!/usr/bin/env bash",
+    "set -euo pipefail",
+    "printf '%s\\n' '{\"type\":\"thread.started\",\"thread_id\":\"0198a000-0000-7000-8000-000000000001\"}'"
+  ].join("\n"))
+  chmodSync(codexBin, 0o700)
+
+  try {
+    await spawnCodexForIssue(baseConfig({ codexBin, stateDir }), linearIssue(), {
+      beforeLaunch: () => calls.push(["before"]),
+      afterExit: async (issue, purpose, logFile) => {
+        calls.push(["after", issue.identifier, purpose, existsSync(logFile)])
+      }
+    })
+
+    assert.deepEqual(calls, [
+      ["before"],
+      ["after", "RYA-1", "work", true]
+    ])
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
 test("review child exit preserves bounded evidence without storing log content", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-review-exit-"))
   const codexBin = join(stateDir, "fake-codex")

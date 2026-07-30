@@ -27,6 +27,7 @@ const FLAG_ENV_KEYS = [
   ["codex-exec-mode", "CODEX_LINEAR_CODEX_EXEC_MODE"],
   ["codex-extra-args", "CODEX_LINEAR_CODEX_EXTRA_ARGS"],
   ["state-dir", "CODEX_LINEAR_STATE_DIR"],
+  ["usage-limit-evidence-file", "CODEX_LINEAR_USAGE_LIMIT_EVIDENCE_FILE"],
   ["wait-timeout-seconds", "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"],
   ["lock-stale-seconds", "CODEX_LINEAR_LOCK_STALE_SECONDS"],
   ["fetch-limit", "CODEX_LINEAR_FETCH_LIMIT"],
@@ -73,6 +74,11 @@ export function loadConfig(options: CliOptions, cwd: string, profile: ConfigProf
     codexExecMode: codexExecMode(merged, "CODEX_LINEAR_CODEX_EXEC_MODE", "attached"),
     codexExtraArgs: splitArgs(value(merged, "CODEX_LINEAR_CODEX_EXTRA_ARGS", "")),
     stateDir,
+    usageLimitEvidenceFile: pathValue(
+      merged,
+      "CODEX_LINEAR_USAGE_LIMIT_EVIDENCE_FILE",
+      defaultUsageLimitEvidenceFile()
+    ),
     waitTimeoutMs: seconds(merged, "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS", 60),
     lockStaleMs: seconds(merged, "CODEX_LINEAR_LOCK_STALE_SECONDS", 600),
     fetchLimit: integer(merged, "CODEX_LINEAR_FETCH_LIMIT", 50),
@@ -89,6 +95,10 @@ function defaultStateDir(profile: ConfigProfile): string {
     ? "codex-linear-review-delegator"
     : "codex-linear-work-delegator"
   return `${process.env.HOME ?? "."}/.local/state/${name}`
+}
+
+function defaultUsageLimitEvidenceFile(): string {
+  return `${process.env.HOME ?? "."}/.local/state/codex-usage-reset-steward/usage-limit-blocked.json`
 }
 
 function applyFlags(env: EnvMap, flags: CliOptions["flags"]): void {

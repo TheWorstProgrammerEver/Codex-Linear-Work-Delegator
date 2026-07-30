@@ -6,6 +6,7 @@ import { getUnresolvedBlockers } from "../linear/dependencies.js"
 import { reportReadinessFailure } from "../codex/readiness-comment.js"
 import { checkCodexReadiness, type CodexReadinessDescriptor, type CodexReadinessResult } from "../codex/readiness.js"
 import { getCodexModel } from "../codex/options.js"
+import { reconcileUsageLimitEvidence } from "../codex/usage-limit-evidence.js"
 import type { Config } from "../env/types.js"
 import type { LinearIssue } from "../linear/types.js"
 
@@ -40,6 +41,7 @@ async function claimNextIssueWithLock(
   }
 
   const linear = new LinearClient(config)
+  await reconcileUsageLimitEvidence(config, linear)
   if (await checkAbandonedRunningWork(config, linear)) return null
 
   const nextIssue = (await linear.getCandidateIssues()).find((issue) => {

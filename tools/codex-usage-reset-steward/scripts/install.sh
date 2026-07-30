@@ -89,6 +89,7 @@ chmod 0600 "$environment_file"
   printf 'CODEX_RESET_STEWARD_POLICY=/etc/codex-usage-reset-steward/policy.json\n'
   printf 'CODEX_RESET_STEWARD_STATE_DIR=/var/lib/codex-usage-reset-steward\n'
   printf 'CODEX_RESET_STEWARD_AUDIT_FILE=/var/log/codex-usage-reset-steward/audit.jsonl\n'
+  printf 'CODEX_RESET_STEWARD_EVIDENCE_FILE=%s/.local/state/codex-usage-reset-steward/usage-limit-blocked.json\n' "$agent_home"
   printf 'CODEX_RESET_STEWARD_KILL_SWITCH=/etc/codex-usage-reset-steward/disabled\n'
   printf 'CODEX_RESET_STEWARD_LOCK_FILE=/run/codex-usage-reset-steward/steward.lock\n'
 } >"$environment_file"

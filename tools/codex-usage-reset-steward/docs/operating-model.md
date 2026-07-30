@@ -14,6 +14,13 @@ pure policy. Consume mode repeats the mutable rate-limit, evidence, and kill
 switch checks immediately before preparing an attempt. Dry-run returns before
 the consume adapter is invoked.
 
+The work and review delegators are the bounded evidence producers. After an
+attached `codex exec --json` exit, they use app-server `thread/read` to verify
+the exact structured `usageLimitExceeded` error, refresh Linear status/labels/
+dependencies, and atomically publish the shared private evidence document.
+Their scheduler startup path removes expired or no-longer-eligible evidence.
+Free-form exec output is never an input to the authorization decision.
+
 The app-server subprocess receives only the environment entries needed for
 Codex authentication and startup. Linear configuration and unrelated service
 environment are not forwarded. Stderr, raw responses, credit IDs, and raw

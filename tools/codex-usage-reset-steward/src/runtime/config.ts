@@ -39,7 +39,7 @@ export function loadRuntimeConfig(
     stateFile: join(stateDirectory, "state.json"),
     auditFile: environment.CODEX_RESET_STEWARD_AUDIT_FILE ?? join(stateDirectory, "audit.jsonl"),
     evidenceFile: environment.CODEX_RESET_STEWARD_EVIDENCE_FILE
-      ?? join(homedir(), ".local", "state", "codex-linear-work-delegator", "usage-limit-blocked.json"),
+      ?? join(homedir(), ".local", "state", "codex-usage-reset-steward", "usage-limit-blocked.json"),
     killSwitchFile: environment.CODEX_RESET_STEWARD_KILL_SWITCH
       ?? "/etc/codex-usage-reset-steward/disabled",
     lockFile: environment.CODEX_RESET_STEWARD_LOCK_FILE
