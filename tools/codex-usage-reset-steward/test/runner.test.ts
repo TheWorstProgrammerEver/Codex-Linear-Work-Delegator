@@ -152,6 +152,55 @@ describe("crash-safe steward orchestration", () => {
     assert.equal(store.state.pending, null)
   })
 
+  it("revalidates stale evidence before recovering a prepared attempt", async () => {
+    const config = runtimeConfig()
+    const store = initialStore()
+    const crashing = dependencies(store, new FakeAppServer(), {
+      fault: (point) => {
+        if (point === "after_prepare") throw new Error("synthetic-crash")
+      }
+    })
+    await assert.rejects(runSteward(config, crashing), /synthetic-crash/)
+    assert.equal(store.state.pending?.phase, "prepared")
+
+    const recoveredApp = new FakeAppServer()
+    const staleNow = new Date(NOW.getTime() + 20 * 60_000)
+    const recovered = dependencies(store, recoveredApp, { now: () => staleNow })
+    const result = await runSteward(config, recovered)
+    assert.equal(result.result, "policy_blocked")
+    assert.ok(result.decision.reasons.includes("evidence_expired"))
+    assert.equal(recoveredApp.consumeKeys.length, 0)
+    assert.equal(store.state.pending?.phase, "prepared")
+  })
+
+  it("requires the same eligible work before recovering a prepared attempt", async () => {
+    const config = runtimeConfig()
+    const store = initialStore()
+    const crashing = dependencies(store, new FakeAppServer(), {
+      fault: (point) => {
+        if (point === "after_prepare") throw new Error("synthetic-crash")
+      }
+    })
+    await assert.rejects(runSteward(config, crashing), /synthetic-crash/)
+
+    const recoveredApp = new FakeAppServer()
+    const recovered = dependencies(store, recoveredApp, {
+      readEvidence: () => evidence({
+        work: {
+          identifier: "RYA-998",
+          state: "in_progress",
+          eligible: true,
+          blockedBy: []
+        }
+      })
+    })
+    const result = await runSteward(config, recovered)
+    assert.equal(result.result, "policy_blocked")
+    assert.ok(result.decision.reasons.includes("evidence_work_mismatch"))
+    assert.equal(recoveredApp.consumeKeys.length, 0)
+    assert.equal(store.state.pending?.phase, "prepared")
+  })
+
   it("recovers a crash after outcome without consuming again", async () => {
     const config = runtimeConfig()
     const store = initialStore()

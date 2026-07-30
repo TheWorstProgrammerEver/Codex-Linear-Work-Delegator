@@ -10,6 +10,7 @@ export type ReasonCode =
   | "evidence_future_dated"
   | "evidence_limit_mismatch"
   | "evidence_missing"
+  | "evidence_work_mismatch"
   | "frequency_limited"
   | "kill_switch_active"
   | "limit_bucket_missing"

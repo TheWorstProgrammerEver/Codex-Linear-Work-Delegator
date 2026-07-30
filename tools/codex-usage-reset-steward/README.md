@@ -90,6 +90,12 @@ sudo scripts/install.sh dry-run
 sudo scripts/install.sh consume
 ```
 
+The installer refuses a dirty checkout, exports the exact Git commit into a
+private temporary directory, and rebuilds there as the unprivileged designated
+user. It never installs the checkout's ignored `dist/` bytes. The immutable
+release retains the compiled CLI, policy, and systemd units from that reviewed
+tree.
+
 The installed units are:
 
 - `codex-usage-reset-steward.service`

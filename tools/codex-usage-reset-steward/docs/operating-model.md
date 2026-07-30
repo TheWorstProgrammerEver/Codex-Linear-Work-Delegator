@@ -35,6 +35,12 @@ generates a second logical attempt. A crash after a known outcome resumes only
 refresh/finalization and does not call consume again. An unknown response or
 schema drift remains pending and fails closed.
 
+A `prepared` attempt proves the consume call was not dispatched. Recovery
+therefore repeats the mutable rate-limit, evidence, frequency, clock, owner,
+policy, and kill-switch gates and requires the same work reference before
+changing the phase to `dispatched`. Stale, missing, or different work leaves
+the prepared record intact and consumes nothing.
+
 An expired ambiguous attempt is deliberately not cleared automatically.
 Activate the kill switch and reconcile it as an operator incident. Preserve
 the idempotency key, inspect only redacted steward result classes and supported
@@ -54,6 +60,11 @@ renames, and synchronizes the containing directory before an external consume
 effect. The state parser validates phase relationships, policy identity, file
 type, owner, mode, link count, and no-follow opening.
 
+Clock observations use the Linux boot ID and `/proc/uptime`, not Node process
+uptime, so independent timer processes share one boot-scoped monotonic
+baseline. Wall-clock and boot-uptime deltas must remain within the configured
+skew while NTP reports synchronized.
+
 Audit JSONL contains only timestamp, code/policy identity, mode, decision,
 stable reason codes, work reference, coarse credit class, coarse exhausted
 bucket flag, and result class. It does not include account usage values,
@@ -61,6 +72,11 @@ reset-credit counts or IDs, raw app-server payloads/errors, prompts, tokens, or
 credentials.
 
 ## Operations
+
+Installation rebuilds from `git archive` of the exact clean commit in a
+private temporary directory as the designated unprivileged user. Ignored or
+stale checkout build output is neither trusted nor copied into the immutable
+release.
 
 Inspect without exposing account values:
 

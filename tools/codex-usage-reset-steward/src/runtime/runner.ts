@@ -152,6 +152,33 @@ async function recoverPending(
   if (pending.phase === "outcome_received") {
     return finalizeOutcome(config, dependencies, state, decision, now)
   }
+  if (pending.phase === "prepared") {
+    const preflightRateLimits = await dependencies.appServer.readRateLimits()
+    const preflightEvidence = dependencies.readEvidence()
+    const preflightNow = dependencies.now()
+    const refreshedDecision = evaluatePolicy(config.policy.config, {
+      nowMs: preflightNow.getTime(),
+      mode: config.mode,
+      configuredOwner: config.configuredOwner,
+      policyApproved: config.policyApproved,
+      killSwitchActive: dependencies.killSwitchActive(),
+      clockStable,
+      evidence: preflightEvidence,
+      rateLimits: preflightRateLimits,
+      lastConsumedAt: state.lastConsumedAt
+    })
+    if (refreshedDecision.workReference !== pending.workReference) {
+      refreshedDecision.consume = false
+      refreshedDecision.reasons = [
+        ...new Set([...refreshedDecision.reasons, "evidence_work_mismatch" as const])
+      ].sort()
+    }
+    if (!refreshedDecision.consume) {
+      audit(config, dependencies, preflightNow, refreshedDecision, "policy_blocked")
+      return { result: "policy_blocked", decision: refreshedDecision }
+    }
+    return dispatchPending(config, dependencies, state, refreshedDecision, preflightNow)
+  }
   return dispatchPending(config, dependencies, state, decision, now)
 }
 

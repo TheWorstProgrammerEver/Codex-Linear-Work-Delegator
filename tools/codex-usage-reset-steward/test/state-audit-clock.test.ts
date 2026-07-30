@@ -4,7 +4,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, it } from "node:test"
 import { AuditLog, buildAuditRecord } from "../src/audit/audit-log.js"
-import { evaluateClockStability } from "../src/clock/stable-clock.js"
+import {
+  SystemClockSource,
+  evaluateClockStability,
+  parseLinuxBootUptimeMs
+} from "../src/clock/stable-clock.js"
 import {
   FileStateStore,
   createInitialState,
@@ -104,6 +108,25 @@ describe("clock stability", () => {
       wallClockMs: 1_000,
       monotonicMs: 10
     }, true, 120), true)
+  })
+
+  it("uses a boot-scoped monotonic source across separate timer processes", () => {
+    const firstProcess = new SystemClockSource({
+      readBootId: () => "boot-a",
+      readWallClockMs: () => 10_000,
+      readMonotonicMs: () => 5_000,
+      readSynchronized: () => true
+    })
+    const first = firstProcess.check(null, 120)
+    const laterProcess = new SystemClockSource({
+      readBootId: () => "boot-a",
+      readWallClockMs: () => 310_000,
+      readMonotonicMs: () => 305_000,
+      readSynchronized: () => true
+    })
+    assert.equal(laterProcess.check(first.observation, 120).stable, true)
+    assert.equal(parseLinuxBootUptimeMs("305.25 123.00\n"), 305_250)
+    assert.throws(() => parseLinuxBootUptimeMs("not-a-clock\n"), /clock-monotonic-source-invalid/)
   })
 
   it("rejects unsynchronized, rolled-back, and skewed clocks", () => {

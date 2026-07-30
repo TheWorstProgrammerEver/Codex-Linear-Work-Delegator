@@ -8,9 +8,10 @@
 | Multi-host double use | Daedalus is the sole v1 writer; local locks are not represented as a cross-host lease |
 | Forged, stale, or unrelated urgency | Structured discriminator; strict schema; short TTL; agent/bucket/work/eligibility match; authoritative account state |
 | Billing scope expansion | Client interface exposes read and earned-reset consume only; no purchase, top-up, plan, spend-control, or billing method |
-| Clock manipulation | NTP synchronization, boot identity, monotonic/wall-clock comparison, rollback/skew rejection |
+| Clock manipulation | NTP synchronization, boot identity, Linux boot-uptime/wall-clock comparison across timer processes, rollback/skew rejection |
+| Unreviewed build output | Dirty-check plus unprivileged rebuild from the exact Git tree; ignored checkout `dist/` is never installed |
 | TOCTOU | Exclusive lock and repeated rate-limit/evidence/kill-switch preflight immediately before durable preparation |
-| Crash or ambiguous transport | Durable `prepared`/`dispatched`/`outcome_received` phases; same UUID; refresh after successful outcomes |
+| Crash or ambiguous transport | Durable `prepared`/`dispatched`/`outcome_received` phases; prepared recovery revalidates mutable authority; dispatched retry reuses the same UUID; refresh after successful outcomes |
 | Sensitive audit output | Allowlisted fields and stable codes; no raw responses/errors, usage values, credit IDs/counts, prompts, tokens, or credentials |
 | Schema drift | Strict required types and enum validation; unknown reached types/outcomes fail closed |
 

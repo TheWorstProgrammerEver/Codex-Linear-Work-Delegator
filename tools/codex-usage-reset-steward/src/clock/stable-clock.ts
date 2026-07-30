@@ -11,18 +11,36 @@ export interface ClockSource {
   check(previous: ClockObservation | null, maximumClockSkewSeconds: number): ClockCheck
 }
 
+interface SystemClockDependencies {
+  readBootId: () => string
+  readMonotonicMs: () => number
+  readWallClockMs: () => number
+  readSynchronized: () => boolean
+}
+
 export class SystemClockSource implements ClockSource {
+  readonly #dependencies: SystemClockDependencies
+
+  constructor(dependencies: SystemClockDependencies = {
+    readBootId: () => readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim(),
+    readMonotonicMs: readLinuxBootUptimeMs,
+    readWallClockMs: Date.now,
+    readSynchronized: readSynchronizationStatus
+  }) {
+    this.#dependencies = dependencies
+  }
+
   check(previous: ClockObservation | null, maximumClockSkewSeconds: number): ClockCheck {
     const observation = {
-      bootId: readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim(),
-      wallClockMs: Date.now(),
-      monotonicMs: Math.round(process.uptime() * 1_000)
+      bootId: this.#dependencies.readBootId(),
+      wallClockMs: this.#dependencies.readWallClockMs(),
+      monotonicMs: this.#dependencies.readMonotonicMs()
     }
     return {
       stable: evaluateClockStability(
         previous,
         observation,
-        readSynchronizationStatus(),
+        this.#dependencies.readSynchronized(),
         maximumClockSkewSeconds
       ),
       observation
@@ -41,7 +59,21 @@ export function evaluateClockStability(
     const wallDelta = observation.wallClockMs - previous.wallClockMs
     const monotonicDelta = observation.monotonicMs - previous.monotonicMs
     const skew = Math.abs(wallDelta - monotonicDelta)
-    return wallDelta >= 0 && monotonicDelta >= 0 && skew <= maximumClockSkewSeconds * 1_000
+  return wallDelta >= 0 && monotonicDelta >= 0 && skew <= maximumClockSkewSeconds * 1_000
+}
+
+export function parseLinuxBootUptimeMs(value: string): number {
+  const secondsText = value.trim().split(/\s+/, 1)[0]
+  const seconds = Number(secondsText)
+  const milliseconds = Math.round(seconds * 1_000)
+  if (!Number.isSafeInteger(milliseconds) || milliseconds < 0) {
+    throw new Error("clock-monotonic-source-invalid")
+  }
+  return milliseconds
+}
+
+function readLinuxBootUptimeMs(): number {
+  return parseLinuxBootUptimeMs(readFileSync("/proc/uptime", "utf8"))
 }
 
 function readSynchronizationStatus(): boolean {
