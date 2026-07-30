@@ -23,7 +23,7 @@ export class InvalidCodexLaunchOptionsError extends Error {
 
 export const getCodexLaunchOptions = (config: Config, issue: LinearIssue): CodexLaunchOptions => {
   const labels = issue.labels.nodes.map(formatLabel)
-  const model = findPrefixedLabel(labels, "agent:model:") ?? config.defaultModel
+  const model = getCodexModel(config, issue)
   const speed = findSpeedLabel(labels)
 
   if (speed === "fast" && !FAST_MODE_MODELS.has(model)) {
@@ -39,6 +39,9 @@ export const getCodexLaunchOptions = (config: Config, issue: LinearIssue): Codex
     speed
   }
 }
+
+export const getCodexModel = (config: Config, issue: LinearIssue): string =>
+  findPrefixedLabel(issue.labels.nodes.map(formatLabel), "agent:model:") ?? config.defaultModel
 
 export const buildCodexArgs = (config: Config, options: CodexLaunchOptions, prompt: string): string[] => [
   "exec",

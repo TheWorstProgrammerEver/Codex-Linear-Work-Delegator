@@ -4,6 +4,9 @@ import { getUnresolvedBlockers } from "../linear/dependencies.js"
 import { matchesLabel } from "../linear/labels.js"
 import { LinearClient } from "../linear.js"
 import { checkAbandonedReview } from "./abandoned-review.js"
+import { reportReadinessFailure } from "../codex/readiness-comment.js"
+import { checkCodexReadiness, type CodexReadinessDescriptor, type CodexReadinessResult } from "../codex/readiness.js"
+import { getCodexModel } from "../codex/options.js"
 import type { Config } from "../env/types.js"
 import type { LinearIssue } from "../linear/types.js"
 
@@ -15,9 +18,12 @@ export interface ReviewLinearClient {
   createComment(issueId: string, body: string): Promise<void>
 }
 
+type ReadinessCheck = (descriptor: CodexReadinessDescriptor) => Promise<CodexReadinessResult>
+
 export async function claimNextReview(
   config: Config,
-  linear: ReviewLinearClient = new LinearClient(config)
+  linear: ReviewLinearClient = new LinearClient(config),
+  readinessCheck: ReadinessCheck = checkCodexReadiness
 ): Promise<LinearIssue | null> {
   const lock = acquireLock(config)
 
@@ -27,13 +33,17 @@ export async function claimNextReview(
   }
 
   try {
-    return await claimNextReviewWithLock(config, linear)
+    return await claimNextReviewWithLock(config, linear, readinessCheck)
   } finally {
     lock.release()
   }
 }
 
-async function claimNextReviewWithLock(config: Config, linear: ReviewLinearClient): Promise<LinearIssue | null> {
+async function claimNextReviewWithLock(
+  config: Config,
+  linear: ReviewLinearClient,
+  readinessCheck: ReadinessCheck
+): Promise<LinearIssue | null> {
   const busy = getCurrentState(config)
   if (busy) {
     console.log(`Reviewer is busy with ${busy.identifier} pid=${busy.pid}; exiting.`)
@@ -57,6 +67,18 @@ async function claimNextReviewWithLock(config: Config, linear: ReviewLinearClien
   if (config.advise) {
     console.log("Advise mode enabled; not claiming or changing Linear state.")
     return nextIssue
+  }
+
+  if (!config.noSpawn) {
+    const readiness = await readinessCheck({
+      codexBin: config.codexBin,
+      model: getCodexModel(config, nextIssue)
+    })
+    if (!readiness.ready) {
+      await reportReadinessFailure(config, linear, nextIssue, readiness, "review")
+      console.error(`Codex readiness failed for review ${nextIssue.identifier}; code=${readiness.code}; review was not claimed.`)
+      return null
+    }
   }
 
   const claimedIssue = await linear.claimReviewIssue(nextIssue)

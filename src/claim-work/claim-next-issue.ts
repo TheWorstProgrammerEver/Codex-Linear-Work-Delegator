@@ -3,10 +3,18 @@ import { checkAbandonedRunningWork } from "./abandoned-running-work.js"
 import { acquireLock } from "../lock.js"
 import { getCurrentState } from "../state.js"
 import { getUnresolvedBlockers } from "../linear/dependencies.js"
+import { reportReadinessFailure } from "../codex/readiness-comment.js"
+import { checkCodexReadiness, type CodexReadinessDescriptor, type CodexReadinessResult } from "../codex/readiness.js"
+import { getCodexModel } from "../codex/options.js"
 import type { Config } from "../env/types.js"
 import type { LinearIssue } from "../linear/types.js"
 
-export async function claimNextIssue(config: Config): Promise<LinearIssue | null> {
+type ReadinessCheck = (descriptor: CodexReadinessDescriptor) => Promise<CodexReadinessResult>
+
+export async function claimNextIssue(
+  config: Config,
+  readinessCheck: ReadinessCheck = checkCodexReadiness
+): Promise<LinearIssue | null> {
   const lock = acquireLock(config)
 
   if (!lock) {
@@ -15,13 +23,16 @@ export async function claimNextIssue(config: Config): Promise<LinearIssue | null
   }
 
   try {
-    return await claimNextIssueWithLock(config)
+    return await claimNextIssueWithLock(config, readinessCheck)
   } finally {
     lock.release()
   }
 }
 
-async function claimNextIssueWithLock(config: Config): Promise<LinearIssue | null> {
+async function claimNextIssueWithLock(
+  config: Config,
+  readinessCheck: ReadinessCheck
+): Promise<LinearIssue | null> {
   const busy = getCurrentState(config)
   if (busy) {
     console.log(`Worker is busy with ${busy.identifier} pid=${busy.pid}; exiting.`)
@@ -50,6 +61,18 @@ async function claimNextIssueWithLock(config: Config): Promise<LinearIssue | nul
   if (config.dryRun) {
     console.log("Dry run enabled; not claiming or spawning.")
     return null
+  }
+
+  if (!config.noSpawn) {
+    const readiness = await readinessCheck({
+      codexBin: config.codexBin,
+      model: getCodexModel(config, nextIssue)
+    })
+    if (!readiness.ready) {
+      await reportReadinessFailure(config, linear, nextIssue, readiness, "work")
+      console.error(`Codex readiness failed for ${nextIssue.identifier}; code=${readiness.code}; issue was not claimed.`)
+      return null
+    }
   }
 
   const claimedIssue = await linear.claimIssue(nextIssue)

@@ -68,6 +68,12 @@ An issue is eligible when:
 - it is not blocked by unresolved Linear dependency relations;
 - it is not already marked busy in local worker state.
 
+Immediately before a normal claim, the worker also verifies that non-interactive
+Codex execution authentication is ready. Linear API authentication and Codex
+execution authentication are separate readiness signals: selecting an issue
+proves the former, while an isolated `codex exec` probe must prove the latter
+before the issue status changes.
+
 Linear may display/create this as a label group named `agent` with child labels such as the agent name (e.g. `my-agent`) or `any`. The CLI supports both forms: exact flat labels like `my-agent`, and grouped labels configured as `agent:my-agent`.
 
 The CLI chooses the highest priority issue first, then oldest created issue.
@@ -257,11 +263,32 @@ Override behavior with environment variables such as `TARGET_USER`, `ENV_FILE`, 
 When an issue is claimed, the CLI:
 
 1. checks for likely abandoned `Agent In Progress` issues for this agent and comments for manual review without changing their status;
-2. moves one eligible issue to `Agent In Progress`;
-3. adds a concise claim comment;
-4. fetches a compact claim-time issue snapshot with bounded description/comment text and lightweight status, label, team, assignee, project, cycle, and dependency context;
-5. writes local state under `CODEX_LINEAR_STATE_DIR`;
-6. spawns `codex exec` for the issue with that compact fallback snapshot in the prompt.
+2. selects one eligible issue while holding the local claim lock;
+3. runs an ephemeral `codex exec` readiness probe in an empty temporary directory with a forced read-only sandbox and no issue prompt;
+4. moves the issue to `Agent In Progress` only after the probe returns its exact marker with no structured tool-activity events;
+5. adds a concise claim comment;
+6. fetches a compact claim-time issue snapshot with bounded description/comment text and lightweight status, label, team, assignee, project, cycle, and dependency context;
+7. writes local state under `CODEX_LINEAR_STATE_DIR`;
+8. spawns `codex exec` for the issue with that compact fallback snapshot in the prompt.
+
+The readiness probe uses the issue's `agent:model:*` selection, falling back to
+`CODEX_LINEAR_DEFAULT_MODEL`, and the worker's normal Codex authentication
+environment. Its input is deliberately separate from the Linear API key, issue
+snapshot, and workload prompt. Raw subprocess output, credential values, and
+environment-file contents are not copied into worker logs or Linear comments.
+
+If the probe reports a deterministic authentication failure, the worker leaves
+the issue in `CODEX_LINEAR_READY_STATUS`, adds a signed comment explaining that
+no claim or workload start occurred, and exits so a later poll can retry after
+authentication is restored. Other probe failures are treated as ambiguous:
+the issue is still not claimed, the signed comment names only a stable result
+code, and operators are told not to infer zero activity from timing or exit
+code. Equivalent behavior applies before review claims. Duplicate readiness
+comments with the same result code and agent signature are suppressed.
+
+`--dry-run` and `--no-spawn` retain their explicit diagnostic behavior and do
+not run the execution-auth probe. In particular, `--no-spawn` intentionally
+claims without starting Codex and should remain an operator-only command.
 
 The startup health check treats labels configured in `CODEX_LINEAR_AGENT_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `agent:any`, it checks the latest claim comment and only warns if that comment says this agent claimed the issue. It does not mark issues failed, kill processes, or infer failure from age alone.
 
@@ -320,10 +347,12 @@ path.
 When a review is selected in apply mode, the runner:
 
 1. checks for likely abandoned `CODEX_LINEAR_REVIEW_RUNNING_STATUS` issues for this reviewer and comments for manual recovery without changing their status;
-2. moves one eligible issue to `CODEX_LINEAR_REVIEW_RUNNING_STATUS`, default `Agent Reviewing`;
-3. adds a concise review-claim comment;
-4. fetches a compact issue snapshot;
-5. spawns `codex exec` with the reviewer prompt.
+2. selects one eligible review while holding the local claim lock;
+3. runs the same isolated Codex execution-auth readiness probe used by the work runner;
+4. moves the issue to `CODEX_LINEAR_REVIEW_RUNNING_STATUS`, default `Agent Reviewing`, only after readiness succeeds;
+5. adds a concise review-claim comment;
+6. fetches a compact issue snapshot;
+7. spawns `codex exec` with the reviewer prompt.
 
 The startup health check treats labels configured in `CODEX_LINEAR_REVIEWER_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `reviewer:any`, it checks the latest review-claim comment and only warns if that comment says this agent claimed the review. It does not mark reviews failed, kill processes, or infer failure from age alone.
 
