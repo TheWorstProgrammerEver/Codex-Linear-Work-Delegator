@@ -97,7 +97,9 @@ release retains the compiled CLI, policy, and systemd units from that reviewed
 tree. A root-owned `codex-home` symlink under the steward's `/etc` directory
 lets the systemd namespace grant the designated user's existing Codex home the
 minimum write access app-server requires. Authentication material remains in
-that existing home and is neither copied nor logged.
+that existing home and is neither copied nor logged. Every install pass
+reloads, enables, and restarts the timer so a dry-run-to-consume reinstall
+cannot leave an elapsed timer without a future trigger.
 
 The installed units are:
 

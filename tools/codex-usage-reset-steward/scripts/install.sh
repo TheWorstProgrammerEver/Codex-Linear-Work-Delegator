@@ -121,8 +121,9 @@ runuser -u daedalus -- env -i \
   "PATH=/usr/local/bin:/usr/bin:/bin" \
   "CODEX_RESET_STEWARD_POLICY=/etc/codex-usage-reset-steward/policy.json" \
   "$install_root/current/dist/src/cli.js" synthetic-check
-systemctl daemon-reload
-systemctl enable --now codex-usage-reset-steward.timer
+env -i \
+  "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+  "$built_source/scripts/activate-timer.sh"
 if [[ "$mode" == "dry-run" ]]; then
   systemctl start codex-usage-reset-steward.service
 fi
