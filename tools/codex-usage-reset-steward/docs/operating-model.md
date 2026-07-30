@@ -2,7 +2,9 @@
 
 ## One bounded invocation
 
-The systemd timer starts a oneshot CLI. The CLI acquires a non-blocking kernel
+The persistent systemd calendar timer starts a oneshot CLI every five minutes,
+independent of whether a prior service activation was skipped by the kill
+switch. The CLI acquires a non-blocking kernel
 `flock`, checks the synchronized clock and durable state, starts
 `codex app-server --listen stdio://`, performs initialize/initialized, and
 calls `account/rateLimits/read`. Stdio reuses the existing Unix user's Codex

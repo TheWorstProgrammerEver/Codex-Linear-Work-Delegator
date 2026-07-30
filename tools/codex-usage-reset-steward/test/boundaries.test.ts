@@ -57,4 +57,14 @@ describe("runtime boundaries", () => {
     )
     assert.doesNotMatch(unit, /^ReadWritePaths=%h\//m)
   })
+
+  it("schedules independently of service condition results", () => {
+    const timer = readFileSync(
+      new URL("../systemd/codex-usage-reset-steward.timer", import.meta.url),
+      "utf8"
+    )
+    assert.match(timer, /^OnCalendar=\*:0\/5$/m)
+    assert.doesNotMatch(timer, /^OnUnit(?:In)?ActiveSec=/m)
+    assert.match(timer, /^Persistent=true$/m)
+  })
 })
