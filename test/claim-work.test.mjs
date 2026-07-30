@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -25,7 +25,7 @@ test("claim exits early when local worker state is busy", async () => {
   console.log = (message) => logs.push(String(message))
 
   try {
-    const result = await claimNextIssue(baseConfig({ stateDir }))
+    const result = await claimNextIssue(baseConfig({ stateDir }), readyCheck)
 
     assert.equal(result, null)
     assert.match(logs.join("\n"), /Worker is busy with RYA-1 pid=/)
@@ -220,7 +220,7 @@ test("claim skips blocked candidates and claims the next eligible issue", async 
   console.log = (message) => logs.push(String(message))
 
   try {
-    const result = await claimNextIssue(baseConfig({ stateDir }))
+    const result = await claimNextIssue(baseConfig({ stateDir }), readyCheck)
 
     assert.equal(result.identifier, "RYA-2")
     assert.deepEqual(calls.map((call) => call[1].statusName), ["Agent In Progress", "Waiting For Agent"])
@@ -355,7 +355,10 @@ test("claim paginates filtered team candidates before declaring no eligible work
   }
 
   try {
-    const result = await claimNextIssue(baseConfig({ stateDir, teamKey: "RYA", fetchLimit: 1 }))
+    const result = await claimNextIssue(
+      baseConfig({ stateDir, teamKey: "RYA", fetchLimit: 1 }),
+      readyCheck
+    )
 
     assert.equal(result.identifier, "RYA-11")
     assert.deepEqual(
@@ -366,6 +369,73 @@ test("claim paginates filtered team candidates before declaring no eligible work
     assert.equal(comments.length, 1)
   } finally {
     globalThis.fetch = originalFetch
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("authentication-unready work remains ready with one signed recovery comment", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-auth-unready-work-"))
+  const candidate = linearIssue({
+    id: "auth-unready",
+    identifier: "RYA-213",
+    state: workflowState("ready", "Waiting For Agent", "unstarted"),
+    labels: [agentLabel("daedalus"), flatLabel("agent:model:gpt-5.6-sol")]
+  })
+  const comments = []
+  const mutations = []
+  const originalFetch = globalThis.fetch
+  const originalError = console.error
+  const originalLog = console.log
+  console.error = () => {}
+  console.log = () => {}
+
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body)
+    if (body.query.includes("query CandidateIssues")) {
+      return jsonResponse({
+        data: {
+          issues: body.variables.statusName === "Waiting For Agent"
+            ? issuePage([candidate])
+            : issuePage([])
+        }
+      })
+    }
+    if (body.query.includes("query GetIssue")) {
+      return jsonResponse({ data: { issue: candidate } })
+    }
+    if (body.query.includes("mutation CommentCreate")) {
+      comments.push(body.variables.input)
+      return jsonResponse({ data: { commentCreate: { success: true, comment: { id: "comment-1" } } } })
+    }
+    if (body.query.includes("mutation IssueUpdate")) {
+      mutations.push(body.variables)
+    }
+    throw new Error(`Unexpected query: ${body.query}`)
+  }
+
+  try {
+    const result = await claimNextIssue(
+      baseConfig({ stateDir }),
+      async (descriptor) => {
+        assert.deepEqual(descriptor, { codexBin: "codex", model: "gpt-5.6-sol" })
+        return { ready: false, code: "authentication-failed" }
+      }
+    )
+
+    assert.equal(result, null)
+    assert.deepEqual(mutations, [])
+    assert.equal(existsSync(join(stateDir, "current.json")), false)
+    assert.equal(comments.length, 1)
+    assert.equal(comments[0].issueId, "auth-unready")
+    assert.match(comments[0].body, /Linear API access succeeded/)
+    assert.match(comments[0].body, /authentication failure/)
+    assert.match(comments[0].body, /remains in `Waiting For Agent`/)
+    assert.match(comments[0].body, /— daedalus\.$/)
+    assert.doesNotMatch(comments[0].body, /test-key/)
+  } finally {
+    globalThis.fetch = originalFetch
+    console.error = originalError
     console.log = originalLog
     rmSync(stateDir, { recursive: true, force: true })
   }
@@ -431,6 +501,11 @@ const agentLabel = (name) => ({
   parent: { id: "agent", name: "agent" }
 })
 
+const flatLabel = (name) => ({
+  id: name,
+  name
+})
+
 const comment = (body, createdAt = "2026-06-29T09:00:00.000Z") => ({
   id: `comment-${createdAt}`,
   body,
@@ -459,6 +534,8 @@ const jsonResponse = (body) =>
     status: 200,
     headers: { "Content-Type": "application/json" }
   })
+
+const readyCheck = async () => ({ ready: true, code: "ready" })
 
 const issuePage = (nodes, hasNextPage = false, endCursor = null) => ({
   nodes,

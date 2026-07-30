@@ -209,7 +209,7 @@ test("review claim skips blocked candidates and claims the next eligible review"
   console.log = (message) => logs.push(String(message))
 
   try {
-    const result = await claimNextReview(baseConfig({ stateDir }))
+    const result = await claimNextReview(baseConfig({ stateDir }), undefined, readyCheck)
 
     assert.equal(result.identifier, "RYA-4")
     assert.deepEqual(updates.map((update) => update.id), ["claimable"])
@@ -377,6 +377,54 @@ test("advise mode can select an explicit issue without claiming", async () => {
   }
 })
 
+test("ambiguous readiness failure leaves review unclaimed with a signed operator-review comment", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-ambiguous-review-"))
+  const issue = linearIssue({
+    id: "ambiguous-review",
+    identifier: "RYA-214",
+    state: workflowState("review", "In Review", "started"),
+    labels: [reviewerLabel("daedalus")]
+  })
+  const comments = []
+  const claims = []
+  const originalError = console.error
+  const originalLog = console.log
+  console.error = () => {}
+  console.log = () => {}
+
+  try {
+    const result = await claimNextReview(
+      baseConfig({ stateDir, reviewIssueId: "RYA-214" }),
+      {
+        getIssue: async () => issue,
+        getReviewCandidateIssues: async () => [],
+        getReviewRunningIssues: async () => [],
+        claimReviewIssue: async () => {
+          claims.push(issue.id)
+          return issue
+        },
+        createComment: async (issueId, body) => comments.push({ issueId, body })
+      },
+      async () => ({ ready: false, code: "probe-process-failed" })
+    )
+
+    assert.equal(result, null)
+    assert.deepEqual(claims, [])
+    assert.equal(comments.length, 1)
+    assert.equal(comments[0].issueId, "ambiguous-review")
+    assert.match(comments[0].body, /did not produce deterministic readiness evidence/)
+    assert.match(comments[0].body, /did not claim this review or change its Linear status/)
+    assert.match(comments[0].body, /remains in `In Review`/)
+    assert.match(comments[0].body, /must not be treated as proof.*exit timing or exit code/)
+    assert.match(comments[0].body, /— daedalus\.$/)
+    assert.doesNotMatch(comments[0].body, /test-key/)
+  } finally {
+    console.error = originalError
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
 test("review prompt includes advise guardrails and state routing", () => {
   const prompt = buildReviewPrompt(baseConfig({
     advise: true,
@@ -493,3 +541,5 @@ const jsonResponse = (body) =>
     status: 200,
     headers: { "Content-Type": "application/json" }
   })
+
+const readyCheck = async () => ({ ready: true, code: "ready" })
