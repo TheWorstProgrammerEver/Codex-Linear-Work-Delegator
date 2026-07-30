@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { describe, it } from "node:test"
 import { parseRateLimitsResponse } from "../src/app-server/rate-limits.js"
 import { parseBlockedWorkEvidence } from "../src/evidence/blocked-work.js"
@@ -42,5 +43,18 @@ describe("runtime boundaries", () => {
     assert.deepEqual(parsePolicy(policy), policy)
     assert.throws(() => parsePolicy({ ...policy, sourceDefaultMode: "consume" }), /policy-invalid/)
     assert.throws(() => parsePolicy({ ...policy, bypass: true }), /policy-unknown-field/)
+  })
+
+  it("grants app-server writes to the designated service user's Codex home", () => {
+    const unit = readFileSync(
+      new URL("../systemd/codex-usage-reset-steward.service", import.meta.url),
+      "utf8"
+    )
+    assert.match(unit, /^User=daedalus$/m)
+    assert.match(
+      unit,
+      /^ReadWritePaths=\/etc\/codex-usage-reset-steward\/codex-home$/m
+    )
+    assert.doesNotMatch(unit, /^ReadWritePaths=%h\//m)
   })
 })
