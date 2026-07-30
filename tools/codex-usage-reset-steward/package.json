@@ -1,0 +1,25 @@
+{
+  "name": "codex-usage-reset-steward",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "codex-usage-reset-steward": "./dist/src/cli.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run scan:secrets",
+    "check:app-server-contract": "node scripts/check-app-server-contract.mjs",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
