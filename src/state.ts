@@ -10,15 +10,21 @@ export interface CurrentState {
   model: string
   startedAt: string
   logFile: string
+  purpose?: "work" | "review"
 }
 
 export function getCurrentState(config: Config): CurrentState | null {
+  const state = readCurrentState(config)
+  if (!state) return null
+  if (isProcessAlive(state.pid)) return state
+  rmSync(currentStatePath(config), { force: true })
+  return null
+}
+
+export function readCurrentState(config: Config): CurrentState | null {
   const file = currentStatePath(config)
   if (!existsSync(file)) return null
-  const state = JSON.parse(readFileSync(file, "utf8")) as CurrentState
-  if (isProcessAlive(state.pid)) return state
-  rmSync(file, { force: true })
-  return null
+  return JSON.parse(readFileSync(file, "utf8")) as CurrentState
 }
 
 export function writeCurrentState(config: Config, state: CurrentState): void {

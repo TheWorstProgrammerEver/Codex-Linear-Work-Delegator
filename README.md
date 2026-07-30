@@ -356,6 +356,43 @@ When a review is selected in apply mode, the runner:
 
 The startup health check treats labels configured in `CODEX_LINEAR_REVIEWER_LABELS` as directly relevant to `CODEX_LINEAR_AGENT_ID`. For `reviewer:any`, it checks the latest review-claim comment and only warns if that comment says this agent claimed the review. It does not mark reviews failed, kill processes, or infer failure from age alone.
 
+An owned issue that remains in `Agent Reviewing` without an active local review
+process is unresolved recovery work. The runner stops before organic review
+discovery every time that condition is present, including when an earlier
+startup-health comment already exists. The marker suppresses duplicate Linear
+comments only; it never suppresses recovery detection or permits an unrelated
+claim. Each poll also emits a concise local recovery line so an already-warned
+review remains visible in service logs.
+
+Review child termination writes a bounded record under
+`CODEX_LINEAR_STATE_DIR/review-runs/`. Record filenames are derived from a
+SHA-256 digest of the Linear issue ID. Records contain the issue/run identity,
+termination kind, exit code or signal when available, log byte count, and a
+SHA-256 digest of at most the final 16 KiB of log bytes. They do not contain log
+excerpts, environment values, or credential material. If a detached child
+disappears before the runner observes its exit, the next startup records
+`process-missing` with the same bounded log-evidence metadata before removing
+stale current state.
+
+Linear status remains the routing authority: a review that moved out of
+`Agent Reviewing` is routed, while one still in that status needs operator
+reconciliation regardless of child exit code. Use the bounded record to locate
+the run, then inspect the local log and external review artifact without
+copying sensitive output into Linear:
+
+- valid published verdict: finish its intended Linear/GitHub route;
+- no verdict and a clean rerun is appropriate: move back to `In Review`;
+- evidence requires implementation changes: preserve the high-level finding
+  and move to `Waiting For Agent` (or the configured review-return status);
+- trusted local/security review or other outside input is required: move to
+  `Blocked` with the concrete recovery requirement.
+
+For a hosted or otherwise safety-filtered reviewer that refuses during
+defensive security work, do not repeatedly submit the same detailed
+adversarial reproduction. Preserve and route the high-level finding without
+unnecessary exploit detail. This refusal-specific recovery path does not limit
+trusted local inference or human security review.
+
 The reviewer prompt tells Codex to classify the artifact, run narrow validation, leave GitHub inline comments plus an overall summary when reviewing PRs, and keep Linear comments concise. Required changes should move the issue to `CODEX_LINEAR_REVIEW_RETURN_STATUS`, default `Waiting For Agent`. Successful reviews should move the issue to `CODEX_LINEAR_REVIEW_PASSED_STATUS`, default `Review Passed`. If that status does not exist, the reviewer must treat it as a review-process setup blocker rather than silently substituting another status.
 
 For GitHub PRs in apply mode, a successful review includes merge ownership. The reviewer should submit the successful GitHub review, verify ready state, checks, required approvals, unresolved review threads, mergeability, and the allowed merge method, then merge the PR before leaving the Linear success comment. If the only obstacle is draft state and the issue/completion evidence says the work is ready for automated review, the reviewer may mark it ready before merge. The Linear success comment must include the external review URL, the merged PR URL, and an explicit statement that the PR was merged. If the PR otherwise passes but cannot be merged, the reviewer should not route to `Review Passed`; they should move the issue to `Waiting For Agent` for work-caused merge blockers or `Blocked` for external/access/human-gate blockers, with a concise Linear comment naming the blocker.

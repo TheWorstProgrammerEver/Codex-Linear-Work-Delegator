@@ -7,6 +7,7 @@ import test from "node:test"
 
 import { spawnCodexForIssue, spawnCodexForReview } from "../dist/codex/spawn.js"
 import { waitForChildOrTimeout } from "../dist/codex/wait.js"
+import { readReviewRunRecord, recoverExitedReviewState } from "../dist/review/run-record.js"
 
 test("spawn failure rejects without writing pid -1 current state", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-spawn-"))
@@ -72,6 +73,68 @@ test("spawned review inherits CODEX_GITHUB_ENV for Momus GitHub helpers", async 
     assert.equal(log.trim(), `CODEX_GITHUB_ENV=${githubEnv}`)
   } finally {
     restoreEnv()
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("review child exit preserves bounded evidence without storing log content", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-review-exit-"))
+  const codexBin = join(stateDir, "fake-codex")
+  const evidence = "required-change evidence that must stay in the local log"
+
+  writeFileSync(codexBin, [
+    "#!/usr/bin/env bash",
+    "set -euo pipefail",
+    `printf '%s\\n' '${evidence}'`,
+    "exit 17"
+  ].join("\n"))
+  chmodSync(codexBin, 0o700)
+
+  try {
+    await spawnCodexForReview(baseConfig({ codexBin, stateDir }), linearIssue())
+
+    const record = readReviewRunRecord(baseConfig({ stateDir }), "issue-1")
+    assert.equal(record.classification, "exited-with-evidence")
+    assert.equal(record.exitCode, 17)
+    assert.equal(record.signal, null)
+    assert.ok(record.logEvidence.byteCount > 0)
+    assert.match(record.logEvidence.tailSha256, /^[a-f0-9]{64}$/)
+    assert.ok(record.logEvidence.sampledTailBytes <= 16 * 1024)
+    assert.doesNotMatch(JSON.stringify(record), new RegExp(evidence))
+    assert.equal(existsSync(join(stateDir, "current.json")), false)
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("startup records evidence when a detached review process disappeared", () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-review-missing-"))
+  const config = baseConfig({ codexExecMode: "detached", stateDir })
+  const logFile = join(stateDir, "review.log")
+  const evidence = "review evidence written before the detached process disappeared"
+
+  writeFileSync(logFile, evidence)
+  writeFileSync(join(stateDir, "current.json"), JSON.stringify({
+    issueId: "issue-1",
+    identifier: "RYA-1",
+    url: "https://linear.app/example/RYA-1",
+    pid: 2_147_483_647,
+    model: "gpt-5.5",
+    startedAt: new Date().toISOString(),
+    logFile,
+    purpose: "review"
+  }))
+
+  try {
+    assert.equal(recoverExitedReviewState(config), null)
+
+    const record = readReviewRunRecord(config, "issue-1")
+    assert.equal(record.classification, "process-missing-with-evidence")
+    assert.equal(record.exitCode, null)
+    assert.ok(record.logEvidence.byteCount > 0)
+    assert.doesNotMatch(JSON.stringify(record), new RegExp(evidence))
+    assert.equal(existsSync(join(stateDir, "current.json")), false)
+  } finally {
     rmSync(stateDir, { recursive: true, force: true })
   }
 })
