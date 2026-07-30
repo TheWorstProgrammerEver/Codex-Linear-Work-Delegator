@@ -1,5 +1,4 @@
 import { acquireLock } from "../lock.js"
-import { getCurrentState } from "../state.js"
 import { getUnresolvedBlockers } from "../linear/dependencies.js"
 import { matchesLabel } from "../linear/labels.js"
 import { LinearClient } from "../linear.js"
@@ -7,6 +6,7 @@ import { checkAbandonedReview } from "./abandoned-review.js"
 import { reportReadinessFailure } from "../codex/readiness-comment.js"
 import { checkCodexReadiness, type CodexReadinessDescriptor, type CodexReadinessResult } from "../codex/readiness.js"
 import { getCodexModel } from "../codex/options.js"
+import { recoverExitedReviewState } from "./run-record.js"
 import type { Config } from "../env/types.js"
 import type { LinearIssue } from "../linear/types.js"
 
@@ -44,7 +44,7 @@ async function claimNextReviewWithLock(
   linear: ReviewLinearClient,
   readinessCheck: ReadinessCheck
 ): Promise<LinearIssue | null> {
-  const busy = getCurrentState(config)
+  const busy = recoverExitedReviewState(config)
   if (busy) {
     console.log(`Reviewer is busy with ${busy.identifier} pid=${busy.pid}; exiting.`)
     return null

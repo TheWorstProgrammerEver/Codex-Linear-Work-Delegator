@@ -1,10 +1,11 @@
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 
-import { checkAbandonedReview, getAbandonedReviewWarnings } from "../dist/review/abandoned-review.js"
+import { captureProcessIdentity } from "../dist/process-identity.js"
+import { checkAbandonedReview, getAbandonedReviews } from "../dist/review/abandoned-review.js"
 import { claimNextReview } from "../dist/review/claim-next-review.js"
 import { buildReviewPrompt } from "../dist/review/prompt.js"
 
@@ -28,14 +29,18 @@ test("startup health check comments on abandoned in-progress reviews", async () 
     assert.equal(comments[0].issueId, "issue-1")
     assert.match(comments[0].body, /Review startup health check:/)
     assert.match(comments[0].body, /still in Agent Reviewing/)
+    assert.match(comments[0].body, /no bounded local exit record/)
     assert.match(comments[0].body, /move the issue back to In Review/)
+    assert.match(comments[0].body, /move the issue to Waiting For Agent/)
+    assert.match(comments[0].body, /safety-filtered model runs/)
+    assert.match(comments[0].body, /does not restrict trusted local inference or human security review/)
     assert.match(comments[0].body, /I am not changing status, killing processes, or assuming failure/)
   } finally {
     rmSync(stateDir, { recursive: true, force: true })
   }
 })
 
-test("review health check skips active and already-warned reviews", () => {
+test("review health check keeps already-warned reviews unresolved while skipping active reviews", () => {
   const config = baseConfig()
   const active = linearIssue({
     id: "active",
@@ -49,13 +54,69 @@ test("review health check skips active and already-warned reviews", () => {
     comments: [comment("Review startup health check: already warned.")]
   })
 
-  const warnings = getAbandonedReviewWarnings(
+  const abandoned = getAbandonedReviews(
     config,
     { issueId: "active", identifier: "RYA-2" },
     [active, alreadyWarned]
   )
 
-  assert.deepEqual(warnings, [])
+  assert.deepEqual(abandoned.map((issue) => issue.id), ["warned"])
+})
+
+test("prior health warning still blocks unrelated review claims without duplicate comments", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-review-prior-warning-"))
+  const processIdentity = captureProcessIdentity(process.pid)
+  assert.ok(processIdentity)
+  writeFileSync(join(stateDir, "current.json"), JSON.stringify({
+    issueId: "stale-local-state",
+    identifier: "RYA-136",
+    url: "https://linear.app/example/RYA-136",
+    pid: process.pid,
+    model: "gpt-5.5",
+    startedAt: new Date().toISOString(),
+    logFile: join(stateDir, "review.log"),
+    purpose: "review",
+    processIdentity: {
+      ...processIdentity,
+      startTimeTicks: `${BigInt(processIdentity.startTimeTicks) + 1n}`
+    }
+  }))
+  const warned = linearIssue({
+    id: "warned",
+    identifier: "RYA-136",
+    labels: [reviewerLabel("daedalus")],
+    state: workflowState("reviewing", "Agent Reviewing", "started"),
+    comments: [comment("Review startup health check: prior warning.")]
+  })
+  const calls = []
+  const logs = []
+  const originalLog = console.log
+  console.log = (message) => logs.push(String(message))
+
+  try {
+    const result = await claimNextReview(baseConfig({ stateDir }), {
+      getReviewRunningIssues: async () => [warned],
+      getIssue: async () => warned,
+      getReviewCandidateIssues: async () => {
+        calls.push("getReviewCandidateIssues")
+        return [linearIssue({ id: "unrelated", identifier: "RYA-200" })]
+      },
+      claimReviewIssue: async () => {
+        calls.push("claimReviewIssue")
+        throw new Error("stale review must prevent a new claim")
+      },
+      createComment: async () => calls.push("createComment")
+    })
+
+    assert.equal(result, null)
+    assert.deepEqual(calls, [])
+    assert.match(logs.join("\n"), /Recovery still required for RYA-136/)
+    assert.match(logs.join("\n"), /prior health warning already exists/)
+    assert.match(logs.join("\n"), /exiting without claiming a new review/)
+  } finally {
+    console.log = originalLog
+    rmSync(stateDir, { recursive: true, force: true })
+  }
 })
 
 test("review health check honors custom configured reviewer labels", () => {
@@ -72,7 +133,7 @@ test("review health check honors custom configured reviewer labels", () => {
     labels: [reviewerLabel("momus")]
   })
 
-  const warnings = getAbandonedReviewWarnings(
+  const warnings = getAbandonedReviews(
     config,
     null,
     [customLabelIssue, defaultAgentLabelIssue]

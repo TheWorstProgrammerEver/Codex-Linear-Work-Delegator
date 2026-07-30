@@ -6,10 +6,13 @@ import test from "node:test"
 
 import { checkAbandonedRunningWork, getAbandonedRunningWorkWarnings } from "../dist/claim-work/abandoned-running-work.js"
 import { claimNextIssue } from "../dist/claim-work/claim-next-issue.js"
+import { captureProcessIdentity } from "../dist/process-identity.js"
 
 test("claim exits early when local worker state is busy", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "codex-linear-busy-"))
   mkdirSync(stateDir, { recursive: true })
+  const processIdentity = captureProcessIdentity(process.pid)
+  assert.ok(processIdentity)
   writeFileSync(join(stateDir, "current.json"), JSON.stringify({
     issueId: "issue-1",
     identifier: "RYA-1",
@@ -17,7 +20,8 @@ test("claim exits early when local worker state is busy", async () => {
     pid: process.pid,
     model: "gpt-5.5",
     startedAt: new Date().toISOString(),
-    logFile: join(stateDir, "worker.log")
+    logFile: join(stateDir, "worker.log"),
+    processIdentity
   }))
 
   const logs = []

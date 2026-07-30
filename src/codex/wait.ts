@@ -3,7 +3,10 @@ import { clearCurrentState } from "../state.js"
 import type { Config } from "../env/types.js"
 
 type ChildProcess = ReturnType<typeof spawn>
-type WaitResult = "exit" | "timeout"
+type BeforeExitStateClear = (result: Extract<ChildWaitResult, { status: "exited" }>) => void
+export type ChildWaitResult =
+  | { status: "exited", exitCode: number | null, signal: NodeJS.Signals | null }
+  | { status: "running", exitCode: null, signal: null }
 
 export const waitForChildStart = (child: ChildProcess): Promise<number> =>
   new Promise((resolve, reject) => {
@@ -36,30 +39,40 @@ export const waitForChildStart = (child: ChildProcess): Promise<number> =>
     child.once("close", onClose)
   })
 
-export async function waitForChildOrTimeout(config: Config, pid: number, child: ChildProcess): Promise<void> {
+export async function waitForChildOrTimeout(
+  config: Config,
+  pid: number,
+  child: ChildProcess,
+  beforeExitStateClear?: BeforeExitStateClear
+): Promise<ChildWaitResult> {
   if (config.codexExecMode === "attached") {
-    await waitForExit(config, pid, child)
+    const result = await waitForExit(config, pid, child)
+    if (result.status !== "exited") throw new Error("Attached Codex wait returned without child exit.")
+    beforeExitStateClear?.(result)
     clearCurrentState(config, pid)
     console.log(`Codex child pid=${pid} exited.`)
-    return
+    return result
   }
 
   if (config.waitTimeoutMs === 0) {
     child.unref()
-    return
+    return runningResult()
   }
 
-  if (await waitForExitOrTimeout(config, pid, config.waitTimeoutMs, child) === "exit") {
+  const result = await waitForExitOrTimeout(config, pid, config.waitTimeoutMs, child)
+  if (result.status === "exited") {
+    beforeExitStateClear?.(result)
     clearCurrentState(config, pid)
     console.log(`Codex child pid=${pid} exited before wait timeout.`)
-    return
+    return result
   }
 
   child.unref()
   console.log(`Codex child pid=${pid} is still running after wait timeout; leaving state for next scheduler run.`)
+  return result
 }
 
-const waitForExit = (config: Config, pid: number, child: ChildProcess): Promise<WaitResult> =>
+const waitForExit = (config: Config, pid: number, child: ChildProcess): Promise<ChildWaitResult> =>
   waitForExitOrTimeout(config, pid, null, child)
 
 const waitForExitOrTimeout = (
@@ -67,10 +80,10 @@ const waitForExitOrTimeout = (
   pid: number,
   timeoutMs: number | null,
   child: ChildProcess
-): Promise<WaitResult> =>
+): Promise<ChildWaitResult> =>
   new Promise((resolve, reject) => {
     if (child.exitCode !== null || child.signalCode !== null) {
-      resolve("exit")
+      resolve(exitedResult(child.exitCode, child.signalCode))
       return
     }
 
@@ -81,23 +94,31 @@ const waitForExitOrTimeout = (
       child.off("close", onClose)
       child.off("error", onError)
     }
-    const finish = (result: WaitResult) => {
+    const finish = (result: ChildWaitResult) => {
       cleanup()
       resolve(result)
     }
-    const onExit = () => finish("exit")
-    const onClose = () => finish("exit")
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish(exitedResult(code, signal))
+    const onClose = (code: number | null, signal: NodeJS.Signals | null) => finish(exitedResult(code, signal))
     const onError = (error: Error) => {
       clearCurrentState(config, pid)
       cleanup()
       reject(error)
     }
 
-    if (timeoutMs !== null) timeout = setTimeout(() => finish("timeout"), timeoutMs)
+    if (timeoutMs !== null) timeout = setTimeout(() => finish(runningResult()), timeoutMs)
     child.once("exit", onExit)
     child.once("close", onClose)
     child.once("error", onError)
   })
+
+const exitedResult = (exitCode: number | null, signal: NodeJS.Signals | null): ChildWaitResult => ({
+  status: "exited",
+  exitCode,
+  signal
+})
+
+const runningResult = (): ChildWaitResult => ({ status: "running", exitCode: null, signal: null })
 
 const formatExitValue = (value: number | string | null): string =>
   value === null ? "null" : String(value)
