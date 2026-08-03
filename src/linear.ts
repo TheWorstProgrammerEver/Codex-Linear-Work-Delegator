@@ -1,5 +1,6 @@
 import { compareIssues } from "./linear/compare.js"
 import { LinearGraphQLClient } from "./linear/graphql.js"
+import { LinearAuthorization } from "./linear/auth.js"
 import { matchesLabel } from "./linear/labels.js"
 import { candidateIssuesQuery, type CandidateIssuesResponse } from "./linear/queries/candidate-issues.js"
 import { commentCreateMutation, type CommentCreateResponse } from "./linear/queries/comment-create.js"
@@ -15,9 +16,15 @@ import type { LinearIssue } from "./linear/types.js"
 
 export class LinearClient {
   private readonly api: LinearGraphQLClient
+  private readonly authorization: LinearAuthorization
 
   constructor(private readonly config: Config) {
-    this.api = new LinearGraphQLClient(config)
+    this.authorization = new LinearAuthorization(config)
+    this.api = new LinearGraphQLClient(config, this.authorization)
+  }
+
+  async getMcpBearerToken(): Promise<string | undefined> {
+    return this.authorization.getMcpBearerToken()
   }
 
   async getCandidateIssues(): Promise<LinearIssue[]> {

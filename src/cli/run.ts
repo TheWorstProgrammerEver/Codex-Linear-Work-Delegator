@@ -14,7 +14,8 @@ export async function runCli(argv: string[], cwd: string): Promise<void> {
   }
 
   const config = loadConfig(options, cwd)
-  const claimedIssue = await claimNextIssue(config)
+  const linear = new LinearClient(config)
+  const claimedIssue = await claimNextIssue(config, undefined, linear)
   if (!claimedIssue) return
 
   if (config.noSpawn) {
@@ -23,7 +24,7 @@ export async function runCli(argv: string[], cwd: string): Promise<void> {
   }
 
   try {
-    await spawnCodexForIssue(config, claimedIssue)
+    await spawnCodexForIssue(config, claimedIssue, undefined, await linear.getMcpBearerToken())
   } catch (error) {
     if (!(error instanceof InvalidCodexLaunchOptionsError)) throw error
 
@@ -37,7 +38,7 @@ export async function runCli(argv: string[], cwd: string): Promise<void> {
       `— ${config.agentId}.`
     ].join("\n")
 
-    await new LinearClient(config).blockIssue(claimedIssue, body)
+    await linear.blockIssue(claimedIssue, body)
     console.error(error.message)
   }
 }

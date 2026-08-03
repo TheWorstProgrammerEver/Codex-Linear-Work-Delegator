@@ -17,17 +17,19 @@ import type { UsageLimitEvidenceLifecycle } from "./usage-limit-evidence.js"
 export async function spawnCodexForIssue(
   config: Config,
   issue: LinearIssue,
-  evidenceLifecycle: UsageLimitEvidenceLifecycle = new StructuredUsageLimitEvidenceLifecycle(config)
+  evidenceLifecycle: UsageLimitEvidenceLifecycle = new StructuredUsageLimitEvidenceLifecycle(config),
+  linearMcpBearerToken?: string
 ): Promise<void> {
-  await spawnCodex(config, issue, buildPrompt(config, issue), "work", evidenceLifecycle)
+  await spawnCodex(config, issue, buildPrompt(config, issue), "work", evidenceLifecycle, linearMcpBearerToken)
 }
 
 export async function spawnCodexForReview(
   config: Config,
   issue: LinearIssue,
-  evidenceLifecycle: UsageLimitEvidenceLifecycle = new StructuredUsageLimitEvidenceLifecycle(config)
+  evidenceLifecycle: UsageLimitEvidenceLifecycle = new StructuredUsageLimitEvidenceLifecycle(config),
+  linearMcpBearerToken?: string
 ): Promise<void> {
-  await spawnCodex(config, issue, buildReviewPrompt(config, issue), "review", evidenceLifecycle)
+  await spawnCodex(config, issue, buildReviewPrompt(config, issue), "review", evidenceLifecycle, linearMcpBearerToken)
 }
 
 async function spawnCodex(
@@ -35,7 +37,8 @@ async function spawnCodex(
   issue: LinearIssue,
   prompt: string,
   purpose: "work" | "review",
-  evidenceLifecycle: UsageLimitEvidenceLifecycle
+  evidenceLifecycle: UsageLimitEvidenceLifecycle,
+  linearMcpBearerToken?: string
 ): Promise<void> {
   const launchOptions = getCodexLaunchOptions(config, issue)
   evidenceLifecycle.beforeLaunch()
@@ -46,6 +49,7 @@ async function spawnCodex(
   const child = spawn(config.codexBin, args, {
     cwd: config.codexCwd,
     detached: config.codexExecMode === "detached",
+    env: buildCodexEnvironment(linearMcpBearerToken),
     stdio: ["ignore", logFd, logFd]
   })
   closeSync(logFd)
@@ -81,6 +85,21 @@ async function spawnCodex(
     }
     throw error
   }
+}
+
+const LINEAR_CREDENTIAL_ENV_KEYS = new Set([
+  "LINEAR_API_KEY",
+  "LINEAR_OAUTH_CLIENT_ID",
+  "LINEAR_OAUTH_CLIENT_SECRET",
+  "CODEX_LINEAR_MCP_BEARER_TOKEN"
+])
+
+export function buildCodexEnvironment(linearMcpBearerToken?: string): NodeJS.ProcessEnv {
+  const environment = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !LINEAR_CREDENTIAL_ENV_KEYS.has(key))
+  )
+  if (linearMcpBearerToken) environment.CODEX_LINEAR_MCP_BEARER_TOKEN = linearMcpBearerToken
+  return environment
 }
 
 function openIssueLog(stateDir: string, issueIdentifier: string): string {

@@ -1,4 +1,5 @@
 import type { Config } from "../env/types.js"
+import { LinearAuthorization, type LinearAuthorizationProvider } from "./auth.js"
 
 interface GraphQLError {
   message: string
@@ -10,20 +11,21 @@ interface GraphQLResponse<T> {
 }
 
 export class LinearGraphQLClient {
-  constructor(private readonly config: Config) {}
+  constructor(
+    private readonly config: Config,
+    private readonly authorization: LinearAuthorizationProvider = new LinearAuthorization(config),
+    private readonly requestFetch: typeof fetch = fetch
+  ) {}
 
   async request<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-    const response = await fetch(this.config.linearApiUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": this.config.linearApiKey,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ query, variables })
-    })
+    let response = await this.send(query, variables)
+    if (response.status === 401 && this.authorization.supportsRefresh) {
+      await this.authorization.invalidate()
+      response = await this.send(query, variables)
+    }
 
     if (!response.ok) {
-      const body = await response.text()
+      const body = response.status === 401 ? "" : await response.text()
       throw new Error(formatHttpError(response.status, body))
     }
 
@@ -32,13 +34,25 @@ export class LinearGraphQLClient {
     if (!payload.data) throw new Error("Linear API response did not include data")
     return payload.data
   }
+
+  private async send(query: string, variables: Record<string, unknown>): Promise<Response> {
+    return this.requestFetch(this.config.linearApiUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": await this.authorization.getAuthorizationHeader(),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query, variables })
+    })
+  }
 }
 
 const formatGraphQLErrors = (errors: GraphQLError[]): string =>
   `Linear API error: ${errors.map((error) => error.message).join("; ")}`
 
 const formatHttpError = (status: number, body: string): string => {
-  const message = `Linear API HTTP ${status}: ${body}`
+  const suffix = body ? `: ${body}` : ""
+  const message = `Linear API HTTP ${status}${suffix}`
   if (!body.toLowerCase().includes("query complexity")) return message
 
   return `${message}

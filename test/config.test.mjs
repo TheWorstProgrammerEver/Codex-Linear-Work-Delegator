@@ -10,12 +10,19 @@ const withTempConfig = (contents, callback) => {
   const cwd = mkdtempSync(join(tmpdir(), "codex-linear-config-"))
   writeFileSync(join(cwd, ".env.defaults"), contents)
   const restoreEnv = cleanEnv([
+    "CODEX_LINEAR_AUTH_MODE",
     "CODEX_LINEAR_CODEX_CWD",
     "CODEX_LINEAR_CODEX_EXEC_MODE",
+    "CODEX_LINEAR_OAUTH_SCOPES",
+    "CODEX_LINEAR_OAUTH_TOKEN_CACHE_FILE",
+    "CODEX_LINEAR_OAUTH_TOKEN_URL",
     "CODEX_LINEAR_REVIEWER_LABELS",
     "CODEX_LINEAR_STATE_DIR",
     "CODEX_LINEAR_USAGE_LIMIT_EVIDENCE_FILE",
-    "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS"
+    "CODEX_LINEAR_WAIT_TIMEOUT_SECONDS",
+    "LINEAR_API_KEY",
+    "LINEAR_OAUTH_CLIENT_ID",
+    "LINEAR_OAUTH_CLIENT_SECRET"
   ])
 
   try {
@@ -45,6 +52,61 @@ test("config defaults Codex execution mode to attached", () => {
 
     assert.equal(config.codexExecMode, "attached")
     assert.equal(config.waitTimeoutMs, 60_000)
+    assert.deepEqual(config.linearAuth, { kind: "api-key", apiKey: "test-key" })
+  })
+})
+
+test("config auto mode prefers complete OAuth client credentials over an API key", () => {
+  withTempConfig([
+    "LINEAR_API_KEY=fallback-key",
+    "LINEAR_OAUTH_CLIENT_ID=test-client",
+    "LINEAR_OAUTH_CLIENT_SECRET=test-secret"
+  ].join("\n"), (cwd) => {
+    const config = loadConfig({ envFiles: [], flags: {} }, cwd)
+
+    assert.equal(config.linearAuth.kind, "oauth-client-credentials")
+    assert.equal(config.linearAuth.clientId, "test-client")
+    assert.equal(config.linearAuth.clientSecret, "test-secret")
+    assert.deepEqual(config.linearAuth.scopes, ["read", "write"])
+    assert.equal(config.linearAuth.tokenCacheFile, join(config.stateDir, "secrets", "linear-oauth-token.json"))
+  })
+})
+
+test("config fails closed for partial OAuth credentials even when an API key exists", () => {
+  withTempConfig([
+    "LINEAR_API_KEY=fallback-key",
+    "LINEAR_OAUTH_CLIENT_ID=test-client"
+  ].join("\n"), (cwd) => {
+    assert.throws(
+      () => loadConfig({ envFiles: [], flags: {} }, cwd),
+      /LINEAR_OAUTH_CLIENT_ID and LINEAR_OAUTH_CLIENT_SECRET must be configured together/
+    )
+  })
+})
+
+test("config can explicitly select API-key fallback when OAuth credentials are present", () => {
+  withTempConfig([
+    "CODEX_LINEAR_AUTH_MODE=api-key",
+    "LINEAR_API_KEY=fallback-key",
+    "LINEAR_OAUTH_CLIENT_ID=test-client",
+    "LINEAR_OAUTH_CLIENT_SECRET=test-secret"
+  ].join("\n"), (cwd) => {
+    assert.deepEqual(loadConfig({ envFiles: [], flags: {} }, cwd).linearAuth, {
+      kind: "api-key",
+      apiKey: "fallback-key"
+    })
+  })
+})
+
+test("config rejects explicit OAuth mode without complete OAuth credentials", () => {
+  withTempConfig([
+    "CODEX_LINEAR_AUTH_MODE=oauth",
+    "LINEAR_API_KEY=fallback-key"
+  ].join("\n"), (cwd) => {
+    assert.throws(
+      () => loadConfig({ envFiles: [], flags: {} }, cwd),
+      /OAuth mode requires LINEAR_OAUTH_CLIENT_ID and LINEAR_OAUTH_CLIENT_SECRET/
+    )
   })
 })
 

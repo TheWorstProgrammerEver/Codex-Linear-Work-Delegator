@@ -7,6 +7,7 @@ export { parseArgs }
 
 const FLAG_ENV_KEYS = [
   ["linear-api-key", "LINEAR_API_KEY"],
+  ["linear-auth-mode", "CODEX_LINEAR_AUTH_MODE"],
   ["linear-api-url", "CODEX_LINEAR_API_URL"],
   ["team-key", "CODEX_LINEAR_TEAM_KEY"],
   ["agent-id", "CODEX_LINEAR_AGENT_ID"],
@@ -46,14 +47,13 @@ export function loadConfig(options: CliOptions, cwd: string, profile: ConfigProf
   Object.assign(merged, process.env)
   applyFlags(merged, options.flags)
 
-  const linearApiKey = required(merged, "LINEAR_API_KEY")
   const agentId = value(merged, "CODEX_LINEAR_AGENT_ID", "anonymous")
   const reviewStatus = value(merged, "CODEX_LINEAR_REVIEW_STATUS", "In Review")
   const stateDir = pathValue(merged, "CODEX_LINEAR_STATE_DIR", defaultStateDir(profile))
   const readyStatus = value(merged, "CODEX_LINEAR_READY_STATUS", "Waiting For Agent")
 
   return {
-    linearApiKey,
+    linearAuth: linearAuthConfig(merged, stateDir),
     linearApiUrl: value(merged, "CODEX_LINEAR_API_URL", "https://api.linear.app/graphql"),
     teamKey: optional(merged, "CODEX_LINEAR_TEAM_KEY"),
     agentId,
@@ -88,6 +88,47 @@ export function loadConfig(options: CliOptions, cwd: string, profile: ConfigProf
     reviewIssueId: optional(merged, "CODEX_LINEAR_REVIEW_ISSUE_ID"),
     reviewArtifactUrl: optional(merged, "CODEX_LINEAR_REVIEW_ARTIFACT_URL")
   }
+}
+
+function linearAuthConfig(env: EnvMap, stateDir: string): Config["linearAuth"] {
+  const mode = value(env, "CODEX_LINEAR_AUTH_MODE", "auto")
+  if (mode !== "auto" && mode !== "oauth" && mode !== "api-key") {
+    throw new Error('CODEX_LINEAR_AUTH_MODE must be "auto", "oauth", or "api-key"')
+  }
+
+  const clientId = optional(env, "LINEAR_OAUTH_CLIENT_ID")
+  const clientSecret = optional(env, "LINEAR_OAUTH_CLIENT_SECRET")
+  const hasPartialOAuth = Boolean(clientId) !== Boolean(clientSecret)
+  if (hasPartialOAuth) {
+    throw new Error("LINEAR_OAUTH_CLIENT_ID and LINEAR_OAUTH_CLIENT_SECRET must be configured together")
+  }
+
+  if (mode !== "api-key" && clientId && clientSecret) {
+    const scopes = list(value(env, "CODEX_LINEAR_OAUTH_SCOPES", "read,write"))
+    if (scopes.length === 0) throw new Error("CODEX_LINEAR_OAUTH_SCOPES must include at least one scope")
+    return {
+      kind: "oauth-client-credentials",
+      clientId,
+      clientSecret,
+      tokenUrl: value(env, "CODEX_LINEAR_OAUTH_TOKEN_URL", "https://api.linear.app/oauth/token"),
+      scopes,
+      tokenCacheFile: pathValue(
+        env,
+        "CODEX_LINEAR_OAUTH_TOKEN_CACHE_FILE",
+        `${stateDir}/secrets/linear-oauth-token.json`
+      )
+    }
+  }
+
+  if (mode === "oauth") {
+    throw new Error("OAuth mode requires LINEAR_OAUTH_CLIENT_ID and LINEAR_OAUTH_CLIENT_SECRET")
+  }
+
+  const apiKey = optional(env, "LINEAR_API_KEY")
+  if (apiKey) return { kind: "api-key", apiKey }
+  throw new Error(
+    "Missing Linear credentials: configure both LINEAR_OAUTH_CLIENT_ID and LINEAR_OAUTH_CLIENT_SECRET, or LINEAR_API_KEY"
+  )
 }
 
 function defaultStateDir(profile: ConfigProfile): string {

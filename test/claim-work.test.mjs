@@ -446,7 +446,7 @@ test("authentication-unready work remains ready with one signed recovery comment
 })
 
 const baseConfig = (overrides = {}) => ({
-  linearApiKey: "test-key",
+  linearAuth: { kind: "api-key", apiKey: "test-key" },
   linearApiUrl: "https://linear.example/graphql",
   agentId: "daedalus",
   agentLabels: ["agent:daedalus", "agent:any"],

@@ -507,7 +507,7 @@ test("review prompt includes advise guardrails and state routing", () => {
 })
 
 const baseConfig = (overrides = {}) => ({
-  linearApiKey: "test-key",
+  linearAuth: { kind: "api-key", apiKey: "test-key" },
   linearApiUrl: "https://linear.example/graphql",
   agentId: "daedalus",
   teamKey: "RYA",

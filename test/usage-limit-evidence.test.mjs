@@ -229,23 +229,38 @@ test("rejects stale or unrelated work and invalidates evidence after Linear reco
 
 test("app-server verifier environment excludes Linear and unrelated credentials", () => {
   const originalLinear = process.env.LINEAR_API_KEY
+  const originalClientId = process.env.LINEAR_OAUTH_CLIENT_ID
+  const originalClientSecret = process.env.LINEAR_OAUTH_CLIENT_SECRET
+  const originalBearer = process.env.CODEX_LINEAR_MCP_BEARER_TOKEN
   const originalHome = process.env.HOME
   process.env.LINEAR_API_KEY = "EXAMPLE_LINEAR_SECRET"
+  process.env.LINEAR_OAUTH_CLIENT_ID = "EXAMPLE_CLIENT_ID"
+  process.env.LINEAR_OAUTH_CLIENT_SECRET = "EXAMPLE_CLIENT_SECRET"
+  process.env.CODEX_LINEAR_MCP_BEARER_TOKEN = "EXAMPLE_BEARER"
   process.env.HOME = "/fixture/home"
   try {
     const environment = buildAppServerEnvironment()
     assert.equal(environment.HOME, "/fixture/home")
     assert.equal("LINEAR_API_KEY" in environment, false)
+    assert.equal("LINEAR_OAUTH_CLIENT_ID" in environment, false)
+    assert.equal("LINEAR_OAUTH_CLIENT_SECRET" in environment, false)
+    assert.equal("CODEX_LINEAR_MCP_BEARER_TOKEN" in environment, false)
   } finally {
     if (originalLinear === undefined) delete process.env.LINEAR_API_KEY
     else process.env.LINEAR_API_KEY = originalLinear
+    if (originalClientId === undefined) delete process.env.LINEAR_OAUTH_CLIENT_ID
+    else process.env.LINEAR_OAUTH_CLIENT_ID = originalClientId
+    if (originalClientSecret === undefined) delete process.env.LINEAR_OAUTH_CLIENT_SECRET
+    else process.env.LINEAR_OAUTH_CLIENT_SECRET = originalClientSecret
+    if (originalBearer === undefined) delete process.env.CODEX_LINEAR_MCP_BEARER_TOKEN
+    else process.env.CODEX_LINEAR_MCP_BEARER_TOKEN = originalBearer
     if (originalHome === undefined) delete process.env.HOME
     else process.env.HOME = originalHome
   }
 })
 
 const baseConfig = (evidenceFile) => ({
-  linearApiKey: "test-key",
+  linearAuth: { kind: "api-key", apiKey: "test-key" },
   linearApiUrl: "https://linear.example/graphql",
   agentId: "daedalus",
   agentLabels: ["agent:daedalus", "agent:any"],

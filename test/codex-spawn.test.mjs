@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 
-import { spawnCodexForIssue, spawnCodexForReview } from "../dist/codex/spawn.js"
+import { buildCodexEnvironment, spawnCodexForIssue, spawnCodexForReview } from "../dist/codex/spawn.js"
 import { waitForChildOrTimeout } from "../dist/codex/wait.js"
 import { readReviewRunRecord, recoverExitedReviewState } from "../dist/review/run-record.js"
 
@@ -74,6 +74,35 @@ test("spawned review inherits CODEX_GITHUB_ENV for Momus GitHub helpers", async 
   } finally {
     restoreEnv()
     rmSync(stateDir, { recursive: true, force: true })
+  }
+})
+
+test("spawn environment strips long-lived Linear credentials and passes only an explicit app bearer token", () => {
+  const restoreEnv = cleanEnv([
+    "CODEX_LINEAR_MCP_BEARER_TOKEN",
+    "LINEAR_API_KEY",
+    "LINEAR_OAUTH_CLIENT_ID",
+    "LINEAR_OAUTH_CLIENT_SECRET",
+    "PATH"
+  ])
+  process.env.CODEX_LINEAR_MCP_BEARER_TOKEN = "stale-bearer"
+  process.env.LINEAR_API_KEY = "personal-api-key"
+  process.env.LINEAR_OAUTH_CLIENT_ID = "client-id"
+  process.env.LINEAR_OAUTH_CLIENT_SECRET = "client-secret"
+  process.env.PATH = "/fixture/bin"
+
+  try {
+    const environment = buildCodexEnvironment("fresh-app-bearer")
+    assert.equal(environment.PATH, "/fixture/bin")
+    assert.equal(environment.CODEX_LINEAR_MCP_BEARER_TOKEN, "fresh-app-bearer")
+    assert.equal("LINEAR_API_KEY" in environment, false)
+    assert.equal("LINEAR_OAUTH_CLIENT_ID" in environment, false)
+    assert.equal("LINEAR_OAUTH_CLIENT_SECRET" in environment, false)
+
+    const fallbackEnvironment = buildCodexEnvironment()
+    assert.equal("CODEX_LINEAR_MCP_BEARER_TOKEN" in fallbackEnvironment, false)
+  } finally {
+    restoreEnv()
   }
 })
 
@@ -269,7 +298,7 @@ const exitedChild = () => {
 }
 
 const baseConfig = (overrides = {}) => ({
-  linearApiKey: "test-key",
+  linearAuth: { kind: "api-key", apiKey: "test-key" },
   linearApiUrl: "https://linear.example/graphql",
   agentId: "daedalus",
   agentLabels: ["agent:daedalus", "agent:any"],

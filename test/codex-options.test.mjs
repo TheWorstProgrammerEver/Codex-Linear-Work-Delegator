@@ -69,7 +69,7 @@ const speedSlice = (args) => {
 }
 
 const baseConfig = (overrides = {}) => ({
-  linearApiKey: "test-key",
+  linearAuth: { kind: "api-key", apiKey: "test-key" },
   linearApiUrl: "https://linear.example/graphql",
   agentId: "daedalus",
   agentLabels: ["agent:daedalus", "agent:any"],

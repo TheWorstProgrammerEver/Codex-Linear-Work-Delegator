@@ -14,7 +14,8 @@ export async function runReviewCli(argv: string[], cwd: string): Promise<void> {
   }
 
   const config = loadConfig(options, cwd, "review")
-  const claimedIssue = await claimNextReview(config)
+  const linear = new LinearClient(config)
+  const claimedIssue = await claimNextReview(config, linear)
   if (!claimedIssue) return
 
   if (config.noSpawn) {
@@ -23,7 +24,7 @@ export async function runReviewCli(argv: string[], cwd: string): Promise<void> {
   }
 
   try {
-    await spawnCodexForReview(config, claimedIssue)
+    await spawnCodexForReview(config, claimedIssue, undefined, await linear.getMcpBearerToken())
   } catch (error) {
     if (!(error instanceof InvalidCodexLaunchOptionsError)) throw error
 
@@ -42,7 +43,7 @@ export async function runReviewCli(argv: string[], cwd: string): Promise<void> {
       return
     }
 
-    await new LinearClient(config).blockIssue(claimedIssue, body)
+    await linear.blockIssue(claimedIssue, body)
     console.error(error.message)
   }
 }
