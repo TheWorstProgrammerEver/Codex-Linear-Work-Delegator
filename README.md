@@ -1,6 +1,6 @@
 # Codex Linear Work Delegator
 
-Local CLI for a Raspberry Pi Codex worker. It polls Linear with a normal API key, claims one eligible issue, and only then starts `codex exec`. The idle polling path uses no LLM/model tokens.
+Local CLI for a dedicated Codex worker. It polls Linear with an OAuth app identity (or an API-key fallback), claims one eligible issue, and only then starts `codex exec`. The idle polling path uses no LLM/model tokens.
 
 This is intentionally not Codex Cloud Tasks. Linear is the backlog and discussion surface; the Pi is the durable execution platform.
 
@@ -15,10 +15,11 @@ npm install
 npm run build
 ```
 
-Create `.env.local` with a Linear API key:
+Create a private OAuth app for the agent, enable client-credentials tokens, and put its credentials in an uncommitted mode-`0600` env file:
 
 ```dotenv
-LINEAR_API_KEY=<your-linear-api-key>
+LINEAR_OAUTH_CLIENT_ID=<agent-app-client-id>
+LINEAR_OAUTH_CLIENT_SECRET=<agent-app-client-secret>
 CODEX_LINEAR_TEAM_KEY=RYA
 CODEX_LINEAR_AGENT_ID=my-agent
 CODEX_LINEAR_AGENT_LABELS=agent:my-agent,agent:any
@@ -132,16 +133,33 @@ The CLI loads configuration in this order:
 4. process environment
 5. CLI flags
 
-Create `.env.local`:
+OAuth client credentials are the recommended production authentication. Linear issues, comments, and status changes are then attributed to the OAuth app user instead of the human who provisioned the host. Use a distinct private OAuth app for each named agent.
 
-```bash
-LINEAR_API_KEY=<your-linear-api-key>
+Create an agent-specific, uncommitted env file:
+
+```dotenv
+LINEAR_OAUTH_CLIENT_ID=<agent-app-client-id>
+LINEAR_OAUTH_CLIENT_SECRET=<agent-app-client-secret>
 CODEX_LINEAR_TEAM_KEY=<linear-team-key>
 CODEX_LINEAR_AGENT_ID=my-agent
 CODEX_LINEAR_AGENT_LABELS=agent:my-agent,agent:any
 ```
 
-Do not commit API keys.
+`CODEX_LINEAR_AUTH_MODE` defaults to `auto`: a complete OAuth credential pair is preferred, while `LINEAR_API_KEY` remains an optional compatibility fallback. Set it to `oauth` to require OAuth or `api-key` to force the fallback. A partial OAuth pair always fails closed instead of silently using the API key.
+
+Client-credentials access tokens are cached in a private `secrets/` subdirectory under the profile state directory and reused until shortly before expiry. The cache directory must be mode `0700` and the token file mode `0600`. Override the default with `CODEX_LINEAR_OAUTH_TOKEN_CACHE_FILE` only when the alternate path has the same protections. The runner invalidates the cache and retries exactly once after an OAuth-authenticated GraphQL `401`.
+
+The spawned Codex child receives only the short-lived OAuth access token through `CODEX_LINEAR_MCP_BEARER_TOKEN`; it does not inherit `LINEAR_API_KEY`, the OAuth client ID, or the OAuth client secret. Configure the host's Linear MCP entry as follows so spawned work uses the same app identity:
+
+```toml
+[mcp_servers.linear]
+url = "https://mcp.linear.app/mcp"
+bearer_token_env_var = "CODEX_LINEAR_MCP_BEARER_TOKEN"
+```
+
+When API-key fallback is active, no API key is forwarded to Codex. Linear MCP therefore falls back to the host's separately configured interactive OAuth identity, so app-level attribution for child MCP actions requires OAuth client-credentials mode.
+
+Do not commit OAuth credentials, API keys, or token caches.
 
 ## Run
 
@@ -210,7 +228,7 @@ no longer eligible, and each new Codex launch clears prior evidence before
 testing the account again.
 
 The app-server verifier receives only the Codex authentication/startup
-environment allowlist; it does not receive `LINEAR_API_KEY`. Evidence excludes
+environment allowlist; it does not receive Linear API or OAuth credentials. Evidence excludes
 prompts, descriptions, error messages, log paths, thread IDs, PIDs, tokens,
 account values, and reset-credit details.
 
@@ -249,7 +267,7 @@ Description=Codex Linear Work Delegator
 Type=oneshot
 WorkingDirectory=/opt/codex-linear-work-delegator
 EnvironmentFile=%h/.config/codex-linear-work-delegator/env
-ExecStart=/usr/bin/npm start -- --env-file %h/.config/codex-linear-work-delegator/env
+ExecStart=/usr/bin/npm start -- --env-file %h/.config/codex-linear-work-delegator/env --env-file %h/.config/codex-linear-daedalus/oauth.env
 TimeoutStartSec=infinity
 KillMode=control-group
 User=my-user
@@ -274,7 +292,8 @@ WantedBy=timers.target
 Basic host install/uninstall scripts live under `scripts/`:
 
 ```bash
-sudo ./scripts/install-schedule.sh
+sudo AUTH_ENV_FILE=~/.config/codex-linear-daedalus/oauth.env \
+  ./scripts/install-schedule.sh
 sudo ./scripts/uninstall-schedule.sh
 ```
 
@@ -285,7 +304,7 @@ Defaults:
 - reads env from `~/.config/codex-linear-work-delegator/env`;
 - polls every 5 minutes after a 2 minute boot delay.
 
-Override behavior with environment variables such as `TARGET_USER`, `ENV_FILE`, `REPO_DIR`, `ON_BOOT_SEC`, `POLL_INTERVAL`, `ACCURACY_SEC`, `SYSTEMD_DIR`, or `SYSTEMCTL_BIN`.
+Override behavior with environment variables such as `TARGET_USER`, `ENV_FILE`, `AUTH_ENV_FILE`, `REPO_DIR`, `ON_BOOT_SEC`, `POLL_INTERVAL`, `ACCURACY_SEC`, `SYSTEMD_DIR`, or `SYSTEMCTL_BIN`. `AUTH_ENV_FILE` is passed to the delegator as a second `--env-file`; it is deliberately not loaded as a systemd `EnvironmentFile`, keeping the OAuth client secret out of the inherited child-process environment.
 
 ## Claim Behavior
 
@@ -438,7 +457,6 @@ For GitHub PRs in apply mode, a successful review includes merge ownership. The 
 Run Momus reviews with a separate env file and state directory from the implementation worker. A Daedalus-host Momus review profile should live at `/home/daedalus/.config/codex-linear-review-delegator/env` and include:
 
 ```dotenv
-LINEAR_API_KEY=<review-linear-api-key>
 CODEX_LINEAR_TEAM_KEY=RYA
 CODEX_LINEAR_AGENT_ID=momus
 CODEX_LINEAR_REVIEWER_LABELS=reviewer:momus,reviewer:any
@@ -466,12 +484,13 @@ sudo UNIT_BASE=codex-linear-review-delegator \
   TIMER_DESCRIPTION="Poll Linear for local Codex reviews" \
   NPM_SCRIPT=start:review \
   ENV_FILE=~/.config/codex-linear-review-delegator/env \
+  AUTH_ENV_FILE=~/.config/codex-linear-momus/oauth.env \
   ./scripts/install-schedule.sh
 ```
 
 ## Notes
 
 - The Linear poller uses the Linear GraphQL API directly.
-- Codex MCP OAuth remains useful for interactive sessions and for the spawned Codex worker.
-- The scheduler should use a dedicated, revocable Linear API key.
-- `LINEAR_API_KEY` is required even for `--dry-run`, because dry-run still performs the real Linear lookup and only skips claiming/spawning.
+- A dedicated OAuth app per agent provides the scheduler and spawned worker with the same distinct, revocable Linear identity.
+- Personal/API-key auth remains available as a fallback but cannot give spawned MCP actions that distinct app identity.
+- Linear credentials are required even for `--dry-run`, because dry-run still performs the real Linear lookup and only skips claiming/spawning.

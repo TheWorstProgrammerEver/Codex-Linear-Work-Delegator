@@ -21,6 +21,7 @@ if ! target_home="$(getent passwd "$target_user" | cut -d: -f6)"; then
 fi
 
 env_file="${ENV_FILE:-$target_home/.config/codex-linear-work-delegator/env}"
+auth_env_file="${AUTH_ENV_FILE:-}"
 npm_bin="${NPM_BIN:-$(command -v npm || true)}"
 service_unit="${unit_base}.service"
 timer_unit="${unit_base}.timer"
@@ -30,6 +31,10 @@ exec_start="$npm_bin start -- --env-file $env_file"
 
 if [[ "$npm_script" != "start" ]]; then
   exec_start="$npm_bin run $npm_script -- --env-file $env_file"
+fi
+
+if [[ -n "$auth_env_file" ]]; then
+  exec_start="$exec_start --env-file $auth_env_file"
 fi
 
 if [[ -z "$npm_bin" ]]; then
@@ -44,6 +49,11 @@ fi
 
 if [[ ! -f "$env_file" ]]; then
   printf 'Expected env file does not exist: %s\n' "$env_file" >&2
+  exit 1
+fi
+
+if [[ -n "$auth_env_file" && ! -f "$auth_env_file" ]]; then
+  printf 'Expected OAuth env file does not exist: %s\n' "$auth_env_file" >&2
   exit 1
 fi
 

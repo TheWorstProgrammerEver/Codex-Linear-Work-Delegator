@@ -4,6 +4,7 @@ Poll Linear, claim one eligible issue, then spawn Codex for that issue.
 
 Options:
   --env-file <path>              Load an additional env file.
+  --linear-auth-mode <mode>      Linear auth: auto, oauth, or api-key. Default: auto.
   --dry-run                      Find the next issue but do not claim or spawn.
   --no-spawn                     Claim the issue but do not spawn Codex.
   --wait-timeout-seconds <sec>   Detached mode only: wait this long before returning. Default: 60.

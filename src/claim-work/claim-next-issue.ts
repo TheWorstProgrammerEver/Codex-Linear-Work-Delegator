@@ -12,9 +12,18 @@ import type { LinearIssue } from "../linear/types.js"
 
 type ReadinessCheck = (descriptor: CodexReadinessDescriptor) => Promise<CodexReadinessResult>
 
+export interface WorkLinearClient {
+  getCandidateIssues(): Promise<LinearIssue[]>
+  getRunningIssues(): Promise<LinearIssue[]>
+  getIssue(issueId: string): Promise<LinearIssue>
+  claimIssue(issue: LinearIssue): Promise<LinearIssue>
+  createComment(issueId: string, body: string): Promise<void>
+}
+
 export async function claimNextIssue(
   config: Config,
-  readinessCheck: ReadinessCheck = checkCodexReadiness
+  readinessCheck: ReadinessCheck = checkCodexReadiness,
+  linear: WorkLinearClient = new LinearClient(config)
 ): Promise<LinearIssue | null> {
   const lock = acquireLock(config)
 
@@ -24,7 +33,7 @@ export async function claimNextIssue(
   }
 
   try {
-    return await claimNextIssueWithLock(config, readinessCheck)
+    return await claimNextIssueWithLock(config, readinessCheck, linear)
   } finally {
     lock.release()
   }
@@ -32,7 +41,8 @@ export async function claimNextIssue(
 
 async function claimNextIssueWithLock(
   config: Config,
-  readinessCheck: ReadinessCheck
+  readinessCheck: ReadinessCheck,
+  linear: WorkLinearClient
 ): Promise<LinearIssue | null> {
   const busy = getCurrentState(config)
   if (busy) {
@@ -40,7 +50,6 @@ async function claimNextIssueWithLock(
     return null
   }
 
-  const linear = new LinearClient(config)
   await reconcileUsageLimitEvidence(config, linear)
   if (await checkAbandonedRunningWork(config, linear)) return null
 

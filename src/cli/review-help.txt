@@ -4,6 +4,7 @@ Poll Linear, select one eligible issue for review, then spawn Codex as a reviewe
 
 Options:
   --env-file <path>                  Load an additional env file.
+  --linear-auth-mode <mode>          Linear auth: auto, oauth, or api-key. Default: auto.
   --dry-run                          Find the next review but do not claim or spawn.
   --no-spawn                         Select or claim the review but do not spawn Codex.
   --advise                           Run review in no-side-effect advise mode.

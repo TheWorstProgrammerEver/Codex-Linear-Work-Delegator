@@ -2,13 +2,18 @@ import { matchesLabel } from "../linear/labels.js"
 import { getCurrentState } from "../state.js"
 import { renderTemplateFile } from "../template.js"
 import type { Config } from "../env/types.js"
-import type { LinearClient } from "../linear.js"
 import type { LinearComment, LinearIssue } from "../linear/types.js"
 import type { CurrentState } from "../state.js"
 
 const HEALTH_WARNING_MARKER = "Startup health check:"
 
-export async function checkAbandonedRunningWork(config: Config, linear: LinearClient): Promise<number> {
+interface AbandonedWorkLinearClient {
+  getRunningIssues(): Promise<LinearIssue[]>
+  getIssue(issueId: string): Promise<LinearIssue>
+  createComment(issueId: string, body: string): Promise<void>
+}
+
+export async function checkAbandonedRunningWork(config: Config, linear: AbandonedWorkLinearClient): Promise<number> {
   const current = getCurrentState(config)
   const issues = await getDetailedHealthCheckIssues(config, linear)
   const abandoned = getAbandonedRunningWorkWarnings(config, current, issues)
@@ -45,7 +50,7 @@ function shouldWarnAboutIssue(config: Config, current: CurrentState | null, issu
   return hasAgentAnyLabel(issue) && latestClaimAgent(issue.comments?.nodes ?? []) === config.agentId
 }
 
-async function getDetailedHealthCheckIssues(config: Config, linear: LinearClient): Promise<LinearIssue[]> {
+async function getDetailedHealthCheckIssues(config: Config, linear: AbandonedWorkLinearClient): Promise<LinearIssue[]> {
   const runningIssues = await linear.getRunningIssues()
   const relevantIssues = runningIssues.filter((issue) =>
     hasAgentSpecificLabel(issue, config.agentId) || hasAgentAnyLabel(issue)

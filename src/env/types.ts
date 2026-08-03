@@ -2,8 +2,22 @@ export interface EnvMap {
   [key: string]: string | undefined
 }
 
+export type LinearAuthConfig =
+  | {
+    kind: "api-key"
+    apiKey: string
+  }
+  | {
+    kind: "oauth-client-credentials"
+    clientId: string
+    clientSecret: string
+    tokenUrl: string
+    scopes: string[]
+    tokenCacheFile: string
+  }
+
 export interface Config {
-  linearApiKey: string
+  linearAuth: LinearAuthConfig
   linearApiUrl: string
   teamKey?: string
   agentId: string

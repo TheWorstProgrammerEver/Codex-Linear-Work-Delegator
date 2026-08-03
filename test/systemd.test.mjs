@@ -79,4 +79,40 @@ test("schedule installer can generate a separate review service", () => {
   }
 })
 
+test("schedule installer passes a protected OAuth env file only to the delegator CLI", () => {
+  const root = mkdtempSync(join(tmpdir(), "codex-linear-systemd-oauth-"))
+  const systemdDir = join(root, "systemd")
+  const envFile = join(root, "worker.env")
+  const authEnvFile = join(root, "oauth.env")
+  writeFileSync(envFile, "LINEAR_API_KEY=fallback-key\n")
+  writeFileSync(authEnvFile, "LINEAR_OAUTH_CLIENT_ID=test-client\nLINEAR_OAUTH_CLIENT_SECRET=test-secret\n")
+
+  try {
+    const result = spawnSync("bash", ["scripts/install-schedule.sh"], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        AUTH_ENV_FILE: authEnvFile,
+        ENV_FILE: envFile,
+        NPM_BIN: process.execPath,
+        SYSTEMCTL_BIN: "true",
+        SYSTEMD_DIR: systemdDir,
+        TARGET_USER: userInfo().username
+      },
+      encoding: "utf8"
+    })
+
+    assert.equal(result.status, 0, result.stderr || result.stdout)
+    const service = readFileSync(join(systemdDir, "codex-linear-work-delegator.service"), "utf8")
+    assert.match(service, new RegExp(
+      `^ExecStart=${escapeRegExp(process.execPath)} start -- --env-file ${escapeRegExp(envFile)} --env-file ${escapeRegExp(authEnvFile)}$`,
+      "m"
+    ))
+    assert.match(service, new RegExp(`^EnvironmentFile=${escapeRegExp(envFile)}$`, "m"))
+    assert.doesNotMatch(service, new RegExp(`^EnvironmentFile=${escapeRegExp(authEnvFile)}$`, "m"))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 const escapeRegExp = (input) => input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
